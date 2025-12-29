@@ -1833,3 +1833,95 @@ body {
     justify-content: flex-end;
     border-top: 1px solid #f1f5f9;
 }
+
+/* ========================================
+   Appointment Status Styles
+   ======================================== */
+.cita-item.estado-pendiente {
+    border-left: 4px solid #f59e0b;
+}
+
+.cita-item.estado-confirmada {
+    border-left: 4px solid var(--green);
+    background: rgba(122, 191, 126, 0.05);
+}
+
+.cita-item.estado-cancelada {
+    border-left: 4px solid var(--coral);
+    opacity: 0.6;
+    background: rgba(232, 139, 139, 0.05);
+}
+
+.cita-item.estado-reagendada {
+    border-left: 4px solid var(--blue);
+    opacity: 0.7;
+    background: rgba(93, 173, 226, 0.05);
+}
+
+.cita-estado.estado-pendiente {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.cita-estado.estado-confirmada {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.cita-estado.estado-cancelada {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.cita-estado.estado-reagendada {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+/* Action Buttons */
+.cita-acciones {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.btn-accion {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-confirmar {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.btn-confirmar:hover {
+    background: #bbf7d0;
+}
+
+.btn-cancelar {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.btn-cancelar:hover {
+    background: #fecaca;
+}
+
+.btn-reagendar {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.btn-reagendar:hover {
+    background: #bfdbfe;
+}

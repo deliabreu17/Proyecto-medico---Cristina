@@ -57,7 +57,22 @@ function mostrarApp() {
     document.getElementById('user-name').textContent = usuarioActual.nombre;
     document.getElementById('user-role').textContent = usuarioActual.rol;
     document.getElementById('user-avatar').textContent = usuarioActual.nombre[0].toUpperCase();
+
+    // Aplicar permisos según rol
+    aplicarPermisosRol();
+
     cargarDashboard();
+}
+
+// Control de permisos por rol
+function aplicarPermisosRol() {
+    const esSecretaria = usuarioActual.rol === 'Secretaria';
+
+    // Ocultar Estadísticas para Secretaria
+    const statsNav = document.querySelector('.nav-item[data-view="estadisticas"]');
+    if (statsNav) {
+        statsNav.style.display = esSecretaria ? 'none' : 'flex';
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -520,6 +535,28 @@ document.getElementById('buscar-paciente')?.addEventListener('input', (e) => {
 // Helpers
 // ========================================
 
+// Estado de citas (almacenado en localStorage)
+function getCitasEstado() {
+    const data = localStorage.getItem('citasEstado');
+    return data ? JSON.parse(data) : {};
+}
+
+function setCitaEstado(citaId, estado) {
+    const estados = getCitasEstado();
+    estados[citaId] = { estado, fecha: new Date().toISOString() };
+    localStorage.setItem('citasEstado', JSON.stringify(estados));
+}
+
+function getCitaEstado(citaId) {
+    const estados = getCitasEstado();
+    return estados[citaId]?.estado || 'pendiente';
+}
+
+// Generar ID único para cita basado en datos
+function generarCitaId(cita) {
+    return `${cita.paciente}_${cita.fecha}_${cita.telefono}`.replace(/[^a-zA-Z0-9]/g, '_');
+}
+
 function mostrarCitas(citas, containerId) {
     const container = document.getElementById(containerId);
 
@@ -528,20 +565,88 @@ function mostrarCitas(citas, containerId) {
         return;
     }
 
-    container.innerHTML = citas.map(cita => `
-        <div class="cita-item solicitada">
-            <div class="cita-avatar">${getInitials(cita.paciente)}</div>
-            <div class="cita-info">
-                <div class="cita-nombre">${cita.paciente}</div>
-                <div class="cita-detalle">📞 ${cita.telefono}</div>
-                <div class="cita-detalle">🩺 ${cita.especialidad}</div>
-                <div class="cita-detalle">📋 ${cita.motivoPrincipal}</div>
-                <div class="cita-detalle">💳 ${cita.tipoSeguro}</div>
-                <div class="cita-detalle">📅 ${cita.fechaTexto || 'Sin fecha'}</div>
+    const estadoLabels = {
+        'pendiente': { texto: '⏳ Pendiente', clase: 'estado-pendiente' },
+        'confirmada': { texto: '✅ Confirmada', clase: 'estado-confirmada' },
+        'cancelada': { texto: '❌ Cancelada', clase: 'estado-cancelada' },
+        'reagendada': { texto: '📅 Reagendada', clase: 'estado-reagendada' }
+    };
+
+    container.innerHTML = citas.map(cita => {
+        const citaId = generarCitaId(cita);
+        const estado = getCitaEstado(citaId);
+        const estadoInfo = estadoLabels[estado] || estadoLabels.pendiente;
+
+        // Botones de acción (solo si no está cancelada)
+        let botonesHTML = '';
+        if (estado !== 'cancelada' && estado !== 'reagendada') {
+            botonesHTML = `
+                <div class="cita-acciones">
+                    ${estado !== 'confirmada' ? `<button class="btn-accion btn-confirmar" onclick="confirmarCita('${citaId}')">✅ Confirmar</button>` : ''}
+                    <button class="btn-accion btn-cancelar" onclick="cancelarCita('${citaId}')">❌ Cancelar</button>
+                    <button class="btn-accion btn-reagendar" onclick="reagendarCita('${citaId}')">📅 Reagendar</button>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="cita-item ${estadoInfo.clase}" data-cita-id="${citaId}">
+                <div class="cita-avatar">${getInitials(cita.paciente)}</div>
+                <div class="cita-info">
+                    <div class="cita-nombre">${cita.paciente}</div>
+                    <div class="cita-detalle">📞 ${cita.telefono}</div>
+                    <div class="cita-detalle">🩺 ${cita.especialidad}</div>
+                    <div class="cita-detalle">📋 ${cita.motivoPrincipal}</div>
+                    <div class="cita-detalle">💳 ${cita.tipoSeguro}</div>
+                    <div class="cita-detalle">📅 ${cita.fechaTexto || 'Sin fecha'}</div>
+                    ${botonesHTML}
+                </div>
+                <span class="cita-estado ${estadoInfo.clase}">${estadoInfo.texto}</span>
             </div>
-            <span class="cita-estado estado-solicitada">Consulta</span>
-        </div>
-    `).join('');
+        `;
+    }).join('');
+}
+
+// Acciones de citas
+function confirmarCita(citaId) {
+    setCitaEstado(citaId, 'confirmada');
+    showToast('Cita confirmada correctamente', 'success');
+    // Recargar vista actual
+    if (document.getElementById('view-citas').classList.contains('active')) {
+        cargarAgenda();
+    } else {
+        cargarDashboard();
+    }
+}
+
+async function cancelarCita(citaId) {
+    const confirmado = await showConfirm('¿Está seguro de cancelar esta cita?', 'Cancelar Cita');
+    if (confirmado) {
+        setCitaEstado(citaId, 'cancelada');
+        showToast('Cita cancelada', 'warning');
+        if (document.getElementById('view-citas').classList.contains('active')) {
+            cargarAgenda();
+        } else {
+            cargarDashboard();
+        }
+    }
+}
+
+function reagendarCita(citaId) {
+    openDatePicker(new Date(), (nuevaFecha) => {
+        setCitaEstado(citaId, 'reagendada');
+        // Guardar nueva fecha
+        const reagendados = JSON.parse(localStorage.getItem('citasReagendadas') || '{}');
+        reagendados[citaId] = nuevaFecha.toISOString();
+        localStorage.setItem('citasReagendadas', JSON.stringify(reagendados));
+
+        showToast(`Cita reagendada para ${nuevaFecha.toLocaleDateString('es-DO')}`, 'info');
+        if (document.getElementById('view-citas').classList.contains('active')) {
+            cargarAgenda();
+        } else {
+            cargarDashboard();
+        }
+    });
 }
 
 function getInitials(nombre) {
