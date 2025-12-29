@@ -679,8 +679,14 @@ function guardarCitaReagendada(citaOriginal, nuevaFecha) {
 }
 
 function reagendarCita(citaId) {
-    // Buscar la cita original
-    const citaOriginal = todasLasCitas.find(c => generarCitaId(c) === citaId);
+    // Buscar la cita original en Google Sheets data
+    let citaOriginal = todasLasCitas.find(c => generarCitaId(c) === citaId);
+
+    // Si no está en todasLasCitas, buscar en citas reagendadas
+    if (!citaOriginal) {
+        const citasReagendadas = getCitasReagendadas();
+        citaOriginal = citasReagendadas.find(c => generarCitaId(c) === citaId);
+    }
 
     if (!citaOriginal) {
         showToast('No se pudo encontrar la cita original', 'error');
