@@ -4,6 +4,7 @@
 
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTXEZOcduqT6LDEGsqwkecQMojBvdY9ejfvsu84luiq-v9YJDtyPhWbLbA6RMwm8256vpzB39kHUesE/pub?gid=411263367&single=true&output=csv';
 const CORS_PROXY = 'https://corsproxy.io/?';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwY6RBxV9lu_TUZMtdmyv2aa50q8VQtPzebORmVHz19rm5Ur6EVsOJdQ_KAP_c4ZtcZ/exec';
 
 const USUARIOS = {
     'admin': { password: 'admin123', nombre: 'Dra. Cristina García Domínguez', rol: 'Administrador' },
@@ -60,6 +61,9 @@ function mostrarApp() {
 
     // Aplicar permisos según rol
     aplicarPermisosRol();
+
+    // Sincronizar estados desde Google Sheets al iniciar
+    sincronizarEstados();
 
     cargarDashboard();
 }
@@ -550,22 +554,72 @@ document.getElementById('buscar-paciente')?.addEventListener('input', (e) => {
 // Helpers
 // ========================================
 
-// Estado de citas (almacenado en localStorage)
+// Estado de citas (sincronizado con Google Sheets)
+let estadosCache = {};
+let sincronizando = false;
+
 function getCitasEstado() {
+    // Primero del cache, luego de localStorage como fallback
+    if (Object.keys(estadosCache).length > 0) {
+        return estadosCache;
+    }
     const data = localStorage.getItem('citasEstado');
     return data ? JSON.parse(data) : {};
 }
 
-function setCitaEstado(citaId, estado) {
+async function setCitaEstado(citaId, estado) {
+    // 1. Guardar localmente para respuesta inmediata
     const estados = getCitasEstado();
     estados[citaId] = { estado, fecha: new Date().toISOString() };
     localStorage.setItem('citasEstado', JSON.stringify(estados));
+    estadosCache = estados;
+
+    // 2. Sincronizar con Google Sheets en segundo plano
+    try {
+        await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors', // Necesario para Apps Script
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                citaId,
+                estado,
+                usuario: usuarioActual?.nombre || 'Sistema'
+            })
+        });
+        console.log('Estado sincronizado con Google Sheets:', citaId, estado);
+    } catch (e) {
+        console.error('Error sincronizando con Google Sheets:', e);
+    }
 }
 
 function getCitaEstado(citaId) {
     const estados = getCitasEstado();
     return estados[citaId]?.estado || 'pendiente';
 }
+
+// Sincronizar estados desde Google Sheets
+async function sincronizarEstados() {
+    if (sincronizando) return;
+    sincronizando = true;
+
+    try {
+        const response = await fetch(APPS_SCRIPT_URL);
+        const estados = await response.json();
+
+        if (estados && typeof estados === 'object' && !estados.error) {
+            estadosCache = estados;
+            localStorage.setItem('citasEstado', JSON.stringify(estados));
+            console.log('Estados sincronizados desde Google Sheets:', Object.keys(estados).length);
+        }
+    } catch (e) {
+        console.error('Error cargando estados desde Google Sheets:', e);
+    } finally {
+        sincronizando = false;
+    }
+}
+
+// Sincronizar automáticamente cada 30 segundos
+setInterval(sincronizarEstados, 30000);
 
 // Generar ID único para cita basado en datos
 function generarCitaId(cita) {
