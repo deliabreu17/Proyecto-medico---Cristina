@@ -432,7 +432,7 @@ async function cargarAgenda() {
         todasLasCitas = await cargarDatosDeGoogle();
     }
 
-    const fechaStr = fechaSeleccionada.toISOString().split('T')[0];
+    const fechaStr = formatearFechaLocal(fechaSeleccionada);
 
     // Filtrar citas de Google Sheets que NO estén reagendadas
     let citasFecha = todasLasCitas.filter(c => {
@@ -653,14 +653,22 @@ function getCitasReagendadas() {
     return data ? JSON.parse(data) : [];
 }
 
+// Formatear fecha en formato YYYY-MM-DD respetando zona horaria local
+function formatearFechaLocal(fecha) {
+    const year = fecha.getFullYear();
+    const month = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 // Guardar cita reagendada con todos sus datos
 function guardarCitaReagendada(citaOriginal, nuevaFecha) {
     const citasReagendadas = getCitasReagendadas();
 
-    // Crear copia de la cita con nueva fecha
+    // Crear copia de la cita con nueva fecha (usando hora local, no UTC)
     const nuevaCita = {
         ...citaOriginal,
-        fecha: nuevaFecha.toISOString().split('T')[0],
+        fecha: formatearFechaLocal(nuevaFecha),
         fechaTexto: nuevaFecha.toLocaleDateString('es-DO', { day: 'numeric', month: 'long' }),
         esReagendada: true,
         citaOriginalId: generarCitaId(citaOriginal)
