@@ -433,7 +433,22 @@ async function cargarAgenda() {
     }
 
     const fechaStr = fechaSeleccionada.toISOString().split('T')[0];
-    const citasFecha = todasLasCitas.filter(c => c.fecha === fechaStr);
+
+    // Filtrar citas de Google Sheets que NO estén reagendadas
+    let citasFecha = todasLasCitas.filter(c => {
+        const citaId = generarCitaId(c);
+        const estado = getCitaEstado(citaId);
+        // Incluir si coincide la fecha Y no está reagendada
+        return c.fecha === fechaStr && estado !== 'reagendada';
+    });
+
+    // Agregar citas reagendadas a esta fecha
+    const citasReagendadas = getCitasReagendadas();
+    citasReagendadas.forEach(citaReag => {
+        if (citaReag.fecha === fechaStr) {
+            citasFecha.push(citaReag);
+        }
+    });
 
     document.getElementById('citas-count').textContent = `${citasFecha.length} cita${citasFecha.length !== 1 ? 's' : ''}`;
     mostrarCitas(citasFecha, 'citas-agenda-lista');
@@ -632,15 +647,46 @@ async function cancelarCita(citaId) {
     }
 }
 
-function reagendarCita(citaId) {
-    openDatePicker(new Date(), (nuevaFecha) => {
-        setCitaEstado(citaId, 'reagendada');
-        // Guardar nueva fecha
-        const reagendados = JSON.parse(localStorage.getItem('citasReagendadas') || '{}');
-        reagendados[citaId] = nuevaFecha.toISOString();
-        localStorage.setItem('citasReagendadas', JSON.stringify(reagendados));
+// Obtener citas reagendadas de localStorage
+function getCitasReagendadas() {
+    const data = localStorage.getItem('citasReagendadasData');
+    return data ? JSON.parse(data) : [];
+}
 
-        showToast(`Cita reagendada para ${nuevaFecha.toLocaleDateString('es-DO')}`, 'info');
+// Guardar cita reagendada con todos sus datos
+function guardarCitaReagendada(citaOriginal, nuevaFecha) {
+    const citasReagendadas = getCitasReagendadas();
+
+    // Crear copia de la cita con nueva fecha
+    const nuevaCita = {
+        ...citaOriginal,
+        fecha: nuevaFecha.toISOString().split('T')[0],
+        fechaTexto: nuevaFecha.toLocaleDateString('es-DO', { day: 'numeric', month: 'long' }),
+        esReagendada: true,
+        citaOriginalId: generarCitaId(citaOriginal)
+    };
+
+    citasReagendadas.push(nuevaCita);
+    localStorage.setItem('citasReagendadasData', JSON.stringify(citasReagendadas));
+}
+
+function reagendarCita(citaId) {
+    // Buscar la cita original
+    const citaOriginal = todasLasCitas.find(c => generarCitaId(c) === citaId);
+
+    if (!citaOriginal) {
+        showToast('No se pudo encontrar la cita original', 'error');
+        return;
+    }
+
+    openDatePicker(new Date(), (nuevaFecha) => {
+        // Marcar la cita original como reagendada
+        setCitaEstado(citaId, 'reagendada');
+
+        // Guardar la cita con la nueva fecha
+        guardarCitaReagendada(citaOriginal, nuevaFecha);
+
+        showToast(`Cita reagendada para ${nuevaFecha.toLocaleDateString('es-DO')}`, 'success');
         if (document.getElementById('view-citas').classList.contains('active')) {
             cargarAgenda();
         } else {
