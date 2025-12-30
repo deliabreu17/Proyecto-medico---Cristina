@@ -1049,12 +1049,33 @@ async function sincronizarEstados() {
 
     try {
         const response = await fetch(APPS_SCRIPT_URL);
-        const estados = await response.json();
+        const estadosRemotos = await response.json();
 
-        if (estados && typeof estados === 'object' && !estados.error) {
-            estadosCache = estados;
-            localStorage.setItem('citasEstado', JSON.stringify(estados));
-            console.log('Estados sincronizados desde Google Sheets:', Object.keys(estados).length);
+        if (estadosRemotos && typeof estadosRemotos === 'object' && !estadosRemotos.error) {
+            // Get current local state
+            const estadosLocales = JSON.parse(localStorage.getItem('citasEstado') || '{}');
+
+            // Merge: remote data + preserve local deletions
+            const estadosMerged = { ...estadosRemotos };
+
+            // Preserve locally deleted transactions
+            Object.keys(estadosLocales).forEach(key => {
+                const local = estadosLocales[key];
+                if (local && local.estado) {
+                    try {
+                        const data = JSON.parse(local.estado);
+                        if (data.deleted === true) {
+                            // Keep the local deletion
+                            estadosMerged[key] = local;
+                            console.log('[SYNC] Preserving local deletion:', key);
+                        }
+                    } catch (e) { }
+                }
+            });
+
+            estadosCache = estadosMerged;
+            localStorage.setItem('citasEstado', JSON.stringify(estadosMerged));
+            console.log('Estados sincronizados desde Google Sheets:', Object.keys(estadosMerged).length);
         }
     } catch (e) {
         console.error('Error cargando estados desde Google Sheets:', e);
