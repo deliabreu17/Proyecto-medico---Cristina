@@ -1091,9 +1091,15 @@ function mostrarCitas(citas, containerId) {
         const notas = getCitaNotas(citaId);
         const telefonoNorm = normalizarTelefono(cita.telefono);
 
-        // Botones de acción (solo si no está cancelada o completada)
+        // Botones de acción
         let botonesHTML = '';
-        if (estado !== 'cancelada' && estado !== 'reagendada' && estado !== 'completada') {
+        if (estado === 'cancelada') {
+            botonesHTML = `
+                <div class="cita-acciones">
+                     <button class="btn-accion" style="background-color: #f39c12; color: white;" onclick="iniciarRestauracion('${citaId}')">↩️ Restaurar</button>
+                </div>
+            `;
+        } else if (estado !== 'reagendada' && estado !== 'completada') {
             botonesHTML = `
                 <div class="cita-acciones">
                     ${estado !== 'confirmada' ? `<button class="btn-accion btn-confirmar" onclick="confirmarCita('${citaId}')">✅ Confirmar</button>` : ''}
@@ -2600,4 +2606,62 @@ async function exportarAuditoriaCSV() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+// ========================================
+// SISTEMA DE RESTAURACIÓN (UNDO)
+// ========================================
+let citaRestaurarId = null;
+
+function iniciarRestauracion(citaId) {
+    // Verificar rol
+    const esAdmin = usuarioActual && usuarioActual.rol === 'Administrador';
+
+    if (esAdmin) {
+        // Admin: Restaurar directo
+        ejecutarRestauracion(citaId);
+    } else {
+        // Secretaria: Requiere clave
+        citaRestaurarId = citaId;
+        const modal = document.getElementById('modal-password-auth');
+        if (modal) {
+            modal.style.display = 'flex';
+            document.getElementById('auth-password').value = '';
+            document.getElementById('auth-password').focus();
+        }
+    }
+}
+
+function cerrarModalPassword() {
+    citaRestaurarId = null;
+    const modal = document.getElementById('modal-password-auth');
+    if (modal) modal.style.display = 'none';
+}
+
+function verificarPasswordRestauracion() {
+    const pass = document.getElementById('auth-password').value;
+    if (pass === 'cristina17') {
+        ejecutarRestauracion(citaRestaurarId);
+        cerrarModalPassword();
+    } else {
+        showToast('Contraseña Incorrecta. Acceso Denegado.', 'error');
+        document.getElementById('auth-password').value = '';
+        document.getElementById('auth-password').focus();
+    }
+}
+
+async function ejecutarRestauracion(citaId) {
+    if (!citaId) return;
+
+    // Restaurar a Pendiente
+    await setCitaEstado(citaId, 'pendiente');
+
+    // Registrar Auditoría
+    await registrarAuditoria('Restaurar Cita', 'Deshacer cancelación (Restaurada a Pendiente)', {
+        citaId: citaId,
+        autorizadoPor: usuarioActual ? usuarioActual.rol : 'Admin'
+    });
+
+    showToast('Cita restaurada correctamente', 'success');
+    recargarVistaActual();
 }
