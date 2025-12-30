@@ -2968,3 +2968,68 @@ body.dark-mode .modal-content {
 .kpi-gasto .kpi-icon { color: #e74c3c; background: #fdedec; }
 .kpi-balance .kpi-icon { color: #8e44ad; background: #f5eef8; }
 
+
+
+/* === PREMIUM FINANCIAL DASHBOARD V2 === */
+/* Matching Reference Design */
+.fin-resumen-wrapper {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    padding: 4px;
+    border-radius: 24px;
+    margin-top: 20px;
+}
+.fin-resumen-inner {
+    background: #f8fafc;
+    border-radius: 20px;
+    padding: 25px;
+}
+/* Override KPI Cards to Match Reference */
+.kpi-card {
+    background: white !important;
+    border-radius: 12px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+    padding: 20px 25px !important;
+}
+.kpi-icon {
+    width: 60px !important;
+    height: 60px !important;
+    font-size: 2rem !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.kpi-ingreso .kpi-icon {
+    background: linear-gradient(135deg, #f6d365 0%, #fda085 100%) !important;
+    color: white !important;
+    box-shadow: 0 4px 15px rgba(253, 160, 133, 0.4) !important;
+}
+.kpi-gasto .kpi-icon {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%) !important;
+    color: #2d3748 !important;
+    box-shadow: 0 4px 15px rgba(168, 237, 234, 0.4) !important;
+}
+.kpi-balance .kpi-icon {
+    background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%) !important;
+    color: #2d3748 !important;
+    box-shadow: 0 4px 15px rgba(252, 182, 159, 0.4) !important;
+}
+.kpi-info p {
+    font-size: 1.6rem !important;
+    font-weight: 700 !important;
+    color: #1a365d !important;
+    background: none !important;
+    -webkit-text-fill-color: #1a365d !important;
+}
+.kpi-ingreso .kpi-info p { color: #22543d !important; -webkit-text-fill-color: #22543d !important; }
+.kpi-gasto .kpi-info p { color: #c53030 !important; -webkit-text-fill-color: #c53030 !important; }
+.kpi-balance .kpi-info p { color: #2b6cb0 !important; -webkit-text-fill-color: #2b6cb0 !important; }
+.chart-container-premium {
+    background: white !important;
+    border-radius: 16px !important;
+    padding: 20px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
+    height: 350px !important;
+    margin-top: 20px;
+}
+

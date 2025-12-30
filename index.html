@@ -621,63 +621,68 @@
                     </div>
                 </div>
 
-                <!-- Resumen Mensual -->
-                <div class="card" style="margin-top: 20px;">
-                    <h3 style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                        📅 Resumen Por Mes
-                        <span style="font-size: 0.75em; font-weight: normal; color: #888;">(detectar meses en
-                            negativo)</span>
-                    </h3>
-                    <!-- FINANCIAL DASHBOARD -->
-                    <div id="fin-dashboard" class="fin-dashboard-grid" style="display: none;">
-                        <!-- KPI Cards -->
-                        <div class="kpi-card kpi-ingreso">
-                            <div class="kpi-icon">💰</div>
-                            <div class="kpi-info">
-                                <h3>Ingresos Totales</h3>
-                                <p id="kpi-total-ingreso">RD$ 0.00</p>
+                <!-- Resumen Mensual - PREMIUM DESIGN -->
+                <div class="fin-resumen-wrapper">
+                    <div class="fin-resumen-inner">
+                        <h3
+                            style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px; font-size: 1.1rem; color: #2d3748;">
+                            📅 Resumen Por Mes
+                            <span style="font-size: 0.75em; font-weight: normal; color: #888;">(detectar meses en
+                                negativo)</span>
+                        </h3>
+
+                        <!-- FINANCIAL DASHBOARD -->
+                        <div id="fin-dashboard" class="fin-dashboard-grid">
+                            <!-- KPI Cards -->
+                            <div class="kpi-card kpi-ingreso">
+                                <div class="kpi-icon">💰</div>
+                                <div class="kpi-info">
+                                    <h3>INGRESOS TOTALES</h3>
+                                    <p id="kpi-total-ingreso">RD$ 0</p>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card kpi-gasto">
+                                <div class="kpi-icon">💸</div>
+                                <div class="kpi-info">
+                                    <h3>GASTOS TOTALES</h3>
+                                    <p id="kpi-total-gasto">RD$ 0</p>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card kpi-balance">
+                                <div class="kpi-icon">⚖️</div>
+                                <div class="kpi-info">
+                                    <h3>BALANCE NETO</h3>
+                                    <p id="kpi-total-balance">RD$ 0</p>
+                                </div>
+                            </div>
+
+                            <!-- Main Chart -->
+                            <div class="chart-container-premium">
+                                <canvas id="finanzaChart"></canvas>
                             </div>
                         </div>
 
-                        <div class="kpi-card kpi-gasto">
-                            <div class="kpi-icon">💸</div>
-                            <div class="kpi-info">
-                                <h3>Gastos Totales</h3>
-                                <p id="kpi-total-gasto">RD$ 0.00</p>
-                            </div>
+                        <!-- Detail Table -->
+                        <h3 class="section-title" style="margin-top: 2rem; font-size: 1rem; color: #4a5568;">📋 Detalle
+                            Mensual</h3>
+                        <div class="table-responsive">
+                            <table class="data-table" id="tabla-resumen-mensual">
+                                <thead>
+                                    <tr>
+                                        <th>MES</th>
+                                        <th>INGRESOS</th>
+                                        <th>GASTOS</th>
+                                        <th>BALANCE</th>
+                                        <th>ESTADO</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lista-resumen-mensual">
+                                    <!-- JS renders rows -->
+                                </tbody>
+                            </table>
                         </div>
-
-                        <div class="kpi-card kpi-balance">
-                            <div class="kpi-icon">⚖️</div>
-                            <div class="kpi-info">
-                                <h3>Balance Neto</h3>
-                                <p id="kpi-total-balance">RD$ 0.00</p>
-                            </div>
-                        </div>
-
-                        <!-- Main Chart -->
-                        <div class="chart-container-premium">
-                            <canvas id="finanzaChart"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Existing Table (Kept for detail view) -->
-                    <h3 class="section-title" style="margin-top: 2rem;">🗓️ Detalle Mensual</h3>
-                    <div class="table-responsive">
-                        <table class="data-table" id="tabla-resumen-mensual">
-                            <thead>
-                                <tr>
-                                    <th>Mes</th>
-                                    <th>Ingresos</th>
-                                    <th>Gastos</th>
-                                    <th>Balance</th>
-                                    <th>Estado</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- JS renders rows -->
-                            </tbody>
-                        </table>
                     </div>
                 </div>
     </div>

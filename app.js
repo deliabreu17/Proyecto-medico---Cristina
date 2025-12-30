@@ -2999,15 +2999,15 @@ function renderizarResumenMensual(estados) {
     });
 
     // Update KPI Cards
-    if (document.getElementById('fin-dashboard')) {
-        document.getElementById('fin-dashboard').style.display = 'grid';
-        document.getElementById('kpi-total-ingreso').innerText = `RD$ ${formatearNumero(totalIngresoGlobal)}`;
-        document.getElementById('kpi-total-gasto').innerText = `RD$ ${formatearNumero(totalGastoGlobal)}`;
+    const kpiIngreso = document.getElementById('kpi-total-ingreso');
+    const kpiGasto = document.getElementById('kpi-total-gasto');
+    const kpiBalance = document.getElementById('kpi-total-balance');
+
+    if (kpiIngreso) kpiIngreso.innerText = `RD$ ${formatearNumero(totalIngresoGlobal)}`;
+    if (kpiGasto) kpiGasto.innerText = `RD$ ${formatearNumero(totalGastoGlobal)}`;
+    if (kpiBalance) {
         const totalBalance = totalIngresoGlobal - totalGastoGlobal;
-        document.getElementById('kpi-total-balance').innerText = `RD$ ${formatearNumero(totalBalance)}`;
-        document.getElementById('kpi-total-balance').style.backgroundImage = totalBalance >= 0
-            ? 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)'
-            : 'linear-gradient(135deg, #c0392b 0%, #e74c3c 100%)';
+        kpiBalance.innerText = `RD$ ${formatearNumero(totalBalance)}`;
     }
 
     // Render Chart
