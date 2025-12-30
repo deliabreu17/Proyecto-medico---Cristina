@@ -2711,6 +2711,35 @@ async function ejecutarRestauracion(citaId) {
 // MÓDULO FINANCIERO (Solo Admin)
 // ========================================
 
+// Switch Tabs
+function switchFinanzaTab(tab) {
+    // Reset tabs
+    document.querySelectorAll('.fin-tab').forEach(t => {
+        t.style.background = '#f0f2f5';
+        t.style.color = '#7f8c8d';
+        t.style.boxShadow = 'none';
+        t.classList.remove('active');
+    });
+
+    // Hide forms
+    document.getElementById('form-container-ingreso').style.display = 'none';
+    document.getElementById('form-container-gasto').style.display = 'none';
+
+    // Activate selected
+    const activeTab = document.getElementById(`tab-${tab}`);
+    if (tab === 'ingreso') {
+        activeTab.style.background = '#27ae60';
+        activeTab.style.color = 'white';
+        activeTab.style.boxShadow = '0 4px 15px rgba(39, 174, 96, 0.3)';
+        document.getElementById('form-container-ingreso').style.display = 'block';
+    } else {
+        activeTab.style.background = '#e74c3c';
+        activeTab.style.color = 'white';
+        activeTab.style.boxShadow = '0 4px 15px rgba(231, 76, 60, 0.3)';
+        document.getElementById('form-container-gasto').style.display = 'block';
+    }
+}
+
 // Guardar Ingreso
 async function guardarIngreso() {
     const monto = parseFloat(document.getElementById('fin-ingreso-monto').value);
