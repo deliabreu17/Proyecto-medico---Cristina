@@ -2967,22 +2967,146 @@ function renderizarResumenMensual(estados) {
         const mesNombre = mesesNombres[parseInt(month) - 1] || month;
         const mesDisplay = `${mesNombre} ${year}`;
 
+        // Populate Table
         const row = document.createElement('tr');
-        row.style.backgroundColor = esNegativo ? 'rgba(231, 76, 60, 0.1)' : '';
+        if (esNegativo) row.classList.add('row-negative');
 
         row.innerHTML = `
-            <td style="font-weight: bold;">${mesDisplay}</td>
-            <td style="color: #27ae60;">RD$ ${formatearNumero(datos.ingresos)}</td>
-            <td style="color: #e74c3c;">RD$ ${formatearNumero(datos.gastos)}</td>
-            <td style="font-weight: bold; color: ${esNegativo ? '#e74c3c' : '#27ae60'};">RD$ ${formatearNumero(balance)}</td>
+            <td style="font-weight: 600;">${mesDisplay}</td>
+            <td style="color: #27ae60; font-family: monospace; font-size: 1.05em;">RD$ ${formatearNumero(datos.ingresos)}</td>
+            <td style="color: #e74c3c; font-family: monospace; font-size: 1.05em;">RD$ ${formatearNumero(datos.gastos)}</td>
+            <td style="font-weight: 700; color: ${esNegativo ? '#c53030' : '#27ae60'}; font-family: monospace; font-size: 1.1em;">RD$ ${formatearNumero(balance)}</td>
             <td>
                 ${esNegativo
-                ? '<span style="background: #e74c3c; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em;">⚠️ NEGATIVO</span>'
-                : '<span style="background: #27ae60; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em;">✅ Positivo</span>'
+                ? '<span class="badge-status badge-danger">⚠️ NEGATIVO</span>'
+                : '<span class="badge-status badge-success">✅ POSITIVO</span>'
             }
             </td>
         `;
         tbodyMensual.appendChild(row);
+
+        // Calculate Totals for KPI Cards
+        totalIngresoGlobal += datos.ingresos;
+        totalGastoGlobal += datos.gastos;
+    });
+
+    // Update KPI Cards
+    if (document.getElementById('fin-dashboard')) {
+        document.getElementById('fin-dashboard').style.display = 'grid';
+        document.getElementById('kpi-total-ingreso').innerText = `RD$ ${formatearNumero(totalIngresoGlobal)}`;
+        document.getElementById('kpi-total-gasto').innerText = `RD$ ${formatearNumero(totalGastoGlobal)}`;
+        const totalBalance = totalIngresoGlobal - totalGastoGlobal;
+        document.getElementById('kpi-total-balance').innerText = `RD$ ${formatearNumero(totalBalance)}`;
+        document.getElementById('kpi-total-balance').style.backgroundImage = totalBalance >= 0
+            ? 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)'
+            : 'linear-gradient(135deg, #c0392b 0%, #e74c3c 100%)';
+    }
+
+    // Render Chart
+    renderFinanzaChart(porMes);
+}
+
+let financeChartInstance = null;
+
+function renderFinanzaChart(resumenMensual) {
+    const ctx = document.getElementById('finanzaChart')?.getContext('2d');
+    if (!ctx) return;
+
+    // Sort keys to ensure chronological order for chart
+    const sortedKeys = Object.keys(resumenMensual).sort((a, b) => a.localeCompare(b));
+
+    // Arrays for Chart Data
+    const labels = sortedKeys.map(key => {
+        const [year, month] = key.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1); // 0-indexed month
+        return date.toLocaleString('es-ES', { month: 'short', year: 'numeric' });
+    });
+
+    const dataIngresos = sortedKeys.map(key => resumenMensual[key].ingresos);
+    const dataGastos = sortedKeys.map(key => resumenMensual[key].gastos);
+
+    if (financeChartInstance) {
+        financeChartInstance.destroy(); // Clear previous chart
+    }
+
+    financeChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Ingresos',
+                    data: dataIngresos,
+                    backgroundColor: 'rgba(46, 204, 113, 0.6)',
+                    borderColor: 'rgba(39, 174, 96, 1)',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    barPercentage: 0.6
+                },
+                {
+                    label: 'Gastos',
+                    data: dataGastos,
+                    backgroundColor: 'rgba(231, 76, 60, 0.6)',
+                    borderColor: 'rgba(192, 57, 43, 1)',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    barPercentage: 0.6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: { family: "'Inter', sans-serif", size: 14 },
+                        usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(44, 62, 80, 0.9)',
+                    padding: 12,
+                    titleFont: { size: 14, weight: 'bold' },
+                    bodyFont: { size: 13 },
+                    callbacks: {
+                        label: function (context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(context.parsed.y);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)',
+                        borderDash: [5, 5]
+                    },
+                    ticks: {
+                        font: { family: "'Inter', sans-serif" },
+                        callback: function (value) {
+                            return 'RD$ ' + value.toLocaleString(); // Shorten format axis
+                        }
+                    }
+                },
+                x: {
+                    grid: { display: false }
+                }
+            },
+            animation: {
+                duration: 1500,
+                easing: 'easeOutQuart'
+            }
+        }
     });
 }
 
