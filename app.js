@@ -3114,19 +3114,52 @@ function renderFinanzaChart(resumenMensual) {
     });
 }
 
-// Eliminar Transacción - Direct approach
-function eliminarTransaccion(id) {
-    console.log('[DEBUG] eliminarTransaccion called with id:', id);
+// Eliminar Transacción - Using Modal
+let transaccionAEliminar = null;
 
-    if (!id) {
-        console.error('[ERROR] ID vacío');
+function eliminarTransaccion(id) {
+    console.log('[DELETE] Iniciando eliminación de:', id);
+    transaccionAEliminar = id;
+
+    // Configurar el modal
+    const modal = document.getElementById('confirm-modal');
+    const title = document.getElementById('confirm-modal-title');
+    const message = document.getElementById('confirm-modal-message');
+    const btnCancel = document.getElementById('confirm-modal-cancel');
+    const btnOk = document.getElementById('confirm-modal-ok');
+
+    if (!modal) {
+        console.error('[DELETE] Modal no encontrado');
+        alert('Error: Modal no disponible');
         return;
     }
 
-    const confirmado = window.confirm('¿Eliminar esta transacción?');
-    console.log('[DEBUG] Usuario confirmó:', confirmado);
+    title.textContent = '🗑️ Eliminar Transacción';
+    message.textContent = '¿Está seguro de que desea eliminar esta transacción? Esta acción no se puede deshacer.';
+    btnOk.textContent = 'Sí, Eliminar';
+    btnOk.className = 'btn-danger';
 
-    if (!confirmado) {
+    // Mostrar modal
+    modal.style.display = 'flex';
+
+    // Configurar botones
+    btnCancel.onclick = function () {
+        modal.style.display = 'none';
+        transaccionAEliminar = null;
+    };
+
+    btnOk.onclick = function () {
+        modal.style.display = 'none';
+        ejecutarEliminacionTransaccion();
+    };
+}
+
+function ejecutarEliminacionTransaccion() {
+    const id = transaccionAEliminar;
+    console.log('[DELETE] Ejecutando eliminación de:', id);
+
+    if (!id) {
+        console.error('[DELETE] No hay ID de transacción');
         return;
     }
 
@@ -3135,34 +3168,27 @@ function eliminarTransaccion(id) {
         const estadosStr = localStorage.getItem('citasEstado') || '{}';
         const estados = JSON.parse(estadosStr);
 
-        console.log('[DEBUG] Estados antes:', Object.keys(estados).length);
-
         // Marcar como eliminado
         estados[id] = {
             estado: JSON.stringify({ deleted: true }),
             fecha: new Date().toISOString()
         };
 
-        // Guardar de vuelta
+        // Guardar
         localStorage.setItem('citasEstado', JSON.stringify(estados));
 
-        console.log('[DEBUG] Transacción marcada como eliminada:', id);
+        console.log('[DELETE] Transacción eliminada:', id);
+        showToast('Transacción eliminada correctamente', 'success');
 
-        // Mostrar toast
-        if (typeof showToast === 'function') {
-            showToast('Transacción eliminada', 'info');
-        } else {
-            alert('Transacción eliminada');
-        }
+        // Limpiar
+        transaccionAEliminar = null;
 
-        // Recargar la tabla
-        if (typeof cargarFinanzas === 'function') {
-            cargarFinanzas();
-        }
+        // Recargar tabla
+        cargarFinanzas();
 
     } catch (error) {
-        console.error('[ERROR] Error al eliminar:', error);
-        alert('Error al eliminar la transacción: ' + error.message);
+        console.error('[DELETE] Error:', error);
+        showToast('Error al eliminar', 'error');
     }
 }
 
