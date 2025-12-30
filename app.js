@@ -2906,7 +2906,7 @@ async function cargarFinanzas() {
             <td>${t.concepto || t.categoria}</td>
             <td style="font-size: 0.85em; color: #666; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${t.nota || '-'}</td>
             <td style="${montoStyle}">RD$ ${formatearNumero(t.monto)}</td>
-            <td><button class="btn-sm btn-danger" onclick="eliminarTransaccion('${t.id}')" title="Eliminar">🗑️</button></td>
+            <td><button class="btn-sm btn-danger btn-eliminar-transaccion" data-id="${t.id}" title="Eliminar">🗑️</button></td>
         `;
         tbody.appendChild(row);
     });
@@ -3120,12 +3120,24 @@ function renderFinanzaChart(resumenMensual) {
 
 // Eliminar Transacción
 async function eliminarTransaccion(id) {
-    if (!confirm('¿Eliminar esta transacción?')) return;
+    console.log('Intentando eliminar:', id);
 
-    // "Eliminar" = sobrescribir el estado con null/empty
-    await setCitaEstado(id, JSON.stringify({ deleted: true }));
-    showToast('Transacción eliminada', 'info');
-    cargarFinanzas();
+    const confirmar = confirm('¿Eliminar esta transacción?');
+    if (!confirmar) {
+        console.log('Cancelado por usuario');
+        return;
+    }
+
+    try {
+        // "Eliminar" = sobrescribir el estado con deleted:true
+        await setCitaEstado(id, JSON.stringify({ deleted: true }));
+        console.log('Transacción eliminada exitosamente:', id);
+        showToast('Transacción eliminada', 'info');
+        await cargarFinanzas();
+    } catch (error) {
+        console.error('Error al eliminar transacción:', error);
+        showToast('Error al eliminar la transacción', 'error');
+    }
 }
 
 // Limpiar Filtros
@@ -3186,3 +3198,15 @@ window.eliminarTransaccion = eliminarTransaccion;
 window.limpiarFiltrosFinanzas = limpiarFiltrosFinanzas;
 window.exportarFinanzasCSV = exportarFinanzasCSV;
 
+// Event Delegation para botones de eliminar transacción
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.btn-eliminar-transaccion');
+    if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const transaccionId = btn.getAttribute('data-id');
+        if (transaccionId) {
+            eliminarTransaccion(transaccionId);
+        }
+    }
+});
