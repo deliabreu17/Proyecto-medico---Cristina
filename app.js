@@ -589,7 +589,7 @@ function renderizarListaPacientes(pacientes) {
         return '<p class="empty-state">No se encontraron pacientes</p>';
     }
     return pacientes.map(p => `
-        <div class="modal-item">
+        <div class="modal-item" onclick="mostrarHistorialPaciente('${p.nombre}')" style="cursor: pointer;" title="Ver historial clínico">
             <div class="paciente-avatar">${getInitials(p.nombre)}</div>
             <div class="modal-item-info">
                 <strong>${p.nombre}</strong>
@@ -726,7 +726,7 @@ function mostrarPacientesLista(pacientes) {
     }
 
     container.innerHTML = pacientes.map(p => `
-        <div class="paciente-card">
+        <div class="paciente-card" onclick="mostrarHistorialPaciente('${p.nombre}')" style="cursor: pointer;" title="Ver historial clínico">
             <div class="paciente-avatar">${getInitials(p.nombre)}</div>
             <div class="paciente-info">
                 <h4>${p.nombre}</h4>
@@ -2080,7 +2080,7 @@ function mostrarNotificaciones() {
         const highlightStyle = esNueva ? 'background-color: rgba(72, 201, 176, 0.1); border-left: 3px solid var(--teal);' : 'border-left: 3px solid transparent;';
 
         return `
-            <div class="notification-item" style="padding: 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border); border-radius: 4px; ${highlightStyle}">
+            <div class="notification-item" onclick="mostrarHistorialPaciente('${cita.paciente}')" style="padding: 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border); border-radius: 4px; ${highlightStyle} cursor: pointer;" title="Ver historial">
                 <div style="display:flex; justify-content:space-between; align-items: flex-start; margin-bottom: 4px;">
                     <strong style="color: var(--text-dark);">${cita.paciente}</strong>
                     ${esNueva ? '<span style="font-size:0.7em; background:var(--teal); color:white; padding:2px 6px; border-radius:10px; font-weight:bold;">NUEVA</span>' : ''}
@@ -2113,5 +2113,59 @@ function verificarAlertasBadge() {
     if (badgeNotif) {
         badgeNotif.style.display = hayNuevas ? 'block' : 'none';
     }
+}
+
+// ========================================
+// Búsqueda Global (Header Omnibox)
+// ========================================
+const globalSearchInput = document.getElementById('global-search');
+const globalSearchResults = document.getElementById('global-search-results');
+
+if (globalSearchInput && globalSearchResults) {
+    globalSearchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+
+        if (query.length < 2) {
+            globalSearchResults.style.display = 'none';
+            return;
+        }
+
+        const pacientesUnicosMap = new Map();
+        todasLasCitas.forEach(c => {
+            const nombreMatch = c.paciente.toLowerCase().includes(query);
+            const telMatch = c.telefono && c.telefono.replace(/\D/g, '').includes(query);
+
+            if (nombreMatch || telMatch) {
+                if (!pacientesUnicosMap.has(c.paciente)) {
+                    pacientesUnicosMap.set(c.paciente, c);
+                }
+            }
+        });
+
+        const resultados = Array.from(pacientesUnicosMap.values()).slice(0, 8); // Top 8
+
+        if (resultados.length > 0) {
+            globalSearchResults.innerHTML = resultados.map(r => `
+                <div class="search-result-item" onclick="mostrarHistorialPaciente('${r.paciente}'); document.getElementById('global-search-results').style.display='none'; document.getElementById('global-search').value='';" style="padding: 12px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 600; color: var(--text-dark);">${r.paciente}</div>
+                        <div style="font-size: 0.85em; color: var(--text-light);">📞 ${r.telefono}</div>
+                    </div>
+                    <div style="font-size: 1.2em;">➡️</div>
+                </div>
+            `).join('');
+            globalSearchResults.style.display = 'block';
+        } else {
+            globalSearchResults.innerHTML = '<div style="padding: 12px; color: var(--text-gray); text-align: center;">No se encontraron resultados</div>';
+            globalSearchResults.style.display = 'block';
+        }
+    });
+
+    // Cerrar al clic fuera
+    document.addEventListener('click', (e) => {
+        if (!globalSearchInput.contains(e.target) && !globalSearchResults.contains(e.target)) {
+            globalSearchResults.style.display = 'none';
+        }
+    });
 }
 
