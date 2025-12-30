@@ -181,21 +181,38 @@ function parsearCSV(csv) {
         const rawSeguro = valSeguroNombre || valSeguroTipo; // Priorizar nombre, fallback a tipo
         const timestampStr = (colIndices.timestamp !== -1) ? (valores[colIndices.timestamp] || '') : '';
 
-        // Parsear fecha de creación para ordenamiento
-        let fechaCreacion = new Date(0); // Fallback
+        // Parsear fecha de creación para ordenamiento y display
+        let fechaCreacion = new Date(0);
         if (timestampStr) {
-            // Intento básico de parseo dd/mm/yyyy hh:mm:ss
-            try {
-                const parts = timestampStr.split(' ');
-                const dateParts = parts[0].split('/');
-                if (dateParts.length === 3) {
-                    // Asume dd/mm/yyyy. Si falla, el Date será Invalid
-                    const timePart = parts.length > 1 ? parts[1] : '00:00:00';
-                    const isoStr = `${dateParts[2]}-${dateParts[1].padStart(2, '0')}-${dateParts[0].padStart(2, '0')}T${timePart}`;
-                    const d = new Date(isoStr);
-                    if (!isNaN(d.getTime())) fechaCreacion = d;
-                }
-            } catch (e) { console.warn('Error parseando timestamp', timestampStr); }
+            // Intento 1: Parseo directo del navegador (cubre ISO y formatos locales comunes)
+            const dNativo = new Date(timestampStr);
+            if (!isNaN(dNativo.getTime())) {
+                fechaCreacion = dNativo;
+            } else {
+                // Intento 2: Parseo manual robusto para dd/mm/yyyy ó mm/dd/yyyy
+                try {
+                    // Limpiar caracteres extraños
+                    const cleanTs = timestampStr.trim().replace(/am|pm|AM|PM/g, '').trim();
+                    const parts = cleanTs.split(' ');
+                    const dateParts = parts[0].split('/');
+
+                    if (dateParts.length === 3) {
+                        const timePart = parts.length > 1 ? parts[1] : '00:00:00';
+                        // Asumir dd/mm/yyyy (Latinoamérica/Europa)
+                        const isoLat = `${dateParts[2]}-${dateParts[1].padStart(2, '0')}-${dateParts[0].padStart(2, '0')}T${timePart}`;
+                        const dLat = new Date(isoLat);
+
+                        if (!isNaN(dLat.getTime())) {
+                            fechaCreacion = dLat;
+                        } else {
+                            // Asumir mm/dd/yyyy (US)
+                            const isoUs = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}T${timePart}`;
+                            const dUs = new Date(isoUs);
+                            if (!isNaN(dUs.getTime())) fechaCreacion = dUs;
+                        }
+                    }
+                } catch (e) { console.warn('Error parseando timestamp manual', timestampStr); }
+            }
         }
 
         if (nombre) {
@@ -2127,18 +2144,9 @@ function cerrarModalNotificaciones() {
 window.cerrarModalNotificaciones = cerrarModalNotificaciones;
 
 function mostrarNotificaciones() {
-    // Copia para no alterar el orden original
-    let citasOrdenadas = [...todasLasCitas];
-
-    // Preferir ordenamiento por Timestamp de creación si existe
-    const tieneTimestamps = citasOrdenadas.some(c => c.creadoEn && c.creadoEn.getTime() > 0);
-
-    if (tieneTimestamps) {
-        citasOrdenadas.sort((a, b) => b.creadoEn - a.creadoEn);
-    } else {
-        // Fallback: Asumir que las últimas del CSV son las más nuevas
-        citasOrdenadas.reverse();
-    }
+    // Usamos el orden del CSV invertido (LIFO) como verdad absoluta de "reciente"
+    // Esto evita problemas si el timestamp falla al parsearse
+    let citasOrdenadas = [...todasLasCitas].reverse();
 
     const topCitas = citasOrdenadas.slice(0, 20); // Mostrar últimas 20
     const container = document.getElementById('lista-notificaciones');
