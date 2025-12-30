@@ -1089,7 +1089,7 @@ function mostrarCitas(citas, containerId) {
         const estado = getCitaEstado(citaId);
         const estadoInfo = estadoLabels[estado] || estadoLabels.pendiente;
         const notas = getCitaNotas(citaId);
-        const telefonoNorm = normalizarTelefono(cita.telefono);
+        const idPaciente = obtenerIdPaciente(cita); // ID robusto
 
         // Botones de acción
         let botonesHTML = '';
@@ -1115,7 +1115,7 @@ function mostrarCitas(citas, containerId) {
 
         return `
             <div class="cita-item ${estadoInfo.clase}" data-cita-id="${citaId}">
-                <div class="cita-avatar" onclick="mostrarHistorialPaciente('${telefonoNorm}')" style="cursor:pointer" title="Ver historial">${getInitials(cita.paciente)}</div>
+                <div class="cita-avatar" onclick="mostrarHistorialPaciente('${idPaciente}')" style="cursor:pointer" title="Ver historial">${getInitials(cita.paciente)}</div>
                 <div class="cita-info">
                     <div class="cita-nombre">${cita.paciente}</div>
                     <div class="cita-detalle">📞 ${cita.telefono}</div>
@@ -1956,7 +1956,7 @@ document.getElementById('global-search')?.addEventListener('input', (e) => {
         dropdown.innerHTML = '<div class="search-result-item"><span class="result-info">No se encontraron resultados</span></div>';
     } else {
         dropdown.innerHTML = resultados.map(p => `
-            <div class="search-result-item" onclick="mostrarHistorialPaciente('${normalizarTelefono(p.telefono)}')">
+            <div class="search-result-item" onclick="mostrarHistorialPaciente('${obtenerIdPaciente(p)}')">
                 <div class="result-avatar">${getInitials(p.nombre)}</div>
                 <div class="result-info">
                     <div class="result-name">${p.nombre}</div>
@@ -2041,6 +2041,21 @@ function guardarNotaModal() {
     }
 }
 
+// Helper para obtener ID seguro (Telefone o Nombre)
+function obtenerIdPaciente(cita) {
+    if (!cita) return '';
+    const telNorm = normalizarTelefono(cita.telefono);
+    // Si tiene teléfono válido (>=6 dígitos), usadlo. Si no, usar nombre.
+    // Esto evita que "20" (un dato sucio) agrupe a Luis y Pedro.
+    if (telNorm && telNorm.length >= 6) {
+        return telNorm;
+    }
+    // Fallback: Nombre completo (remover comillas por seguridad html)
+    // Soporte para objetos 'cita' (paciente) y 'paciente Resumen' (nombre)
+    const nombre = cita.paciente || cita.nombre || '';
+    return nombre.replace(/['"]/g, '');
+}
+
 // ========================================
 // Historial de Paciente
 // ========================================
@@ -2048,26 +2063,30 @@ function mostrarHistorialPaciente(identificador) {
     if (!identificador) return;
     const idStr = String(identificador).toLowerCase().trim();
 
-    // Buscar todas las citas que coincidan por Teléfono o Nombre
+    // Determinar estrategia de búsqueda
+    // Si son solo dígitos Y largo >=6, es búsqueda exacta por teléfono.
+    // Si no, es búsqueda por nombre.
+    const esBusquedaPorTelefono = /^\d+$/.test(idStr) && idStr.length >= 6;
+
+    // Buscar todas las citas que coincidan
     const citasPaciente = todasLasCitas.filter(c => {
-        const telNorm = normalizarTelefono(c.telefono);
-        const nombreLower = c.paciente.toLowerCase();
-
-        // Match exacto teléfono
-        if (telNorm === idStr) return true;
-
-        // Match nombre (flexible)
-        if (nombreLower.includes(idStr)) return true;
-
-        return false;
+        if (esBusquedaPorTelefono) {
+            return normalizarTelefono(c.telefono) === idStr;
+        } else {
+            // Búsqueda por Nombre (usamos includes para flexibilidad o exacto?)
+            // Si el ID vino del helper 'obtenerIdPaciente', es el nombre exacto.
+            // Pero si el usuario escribió "Luis" en el buscador, es parcial.
+            // Usamos includes para soportar buscador, pero con cuidado.
+            return c.paciente.toLowerCase().includes(idStr);
+        }
     });
 
     if (citasPaciente.length === 0) {
-        showToast('No se encontró historial para este paciente', 'warning');
+        showToast('No se encontró historial con ese criterio', 'warning');
         return;
     }
 
-    // Obtener nombre del paciente (el más largo)
+    // Obtener nombre del paciente (el más largo para display)
     const nombrePaciente = citasPaciente.reduce((longest, c) =>
         c.paciente.length > longest.length ? c.paciente : longest
         , '');
@@ -2075,7 +2094,7 @@ function mostrarHistorialPaciente(identificador) {
     // Ordenar por fecha (más reciente primero)
     citasPaciente.sort((a, b) => {
         if (!a.fecha || !b.fecha) return 0;
-        return b.fecha.localeCompare(a.fecha);
+        return b.fecha - a.fecha;
     });
 
     // Crear modal
@@ -2087,6 +2106,10 @@ function mostrarHistorialPaciente(identificador) {
         document.body.appendChild(modal);
     }
 
+    // Calcular resumen
+    const totalCitas = citasPaciente.length;
+    const ultimoTel = citasPaciente[0].telefono;
+
     modal.innerHTML = `
         <div class="modal-content history-modal-content">
             <div class="modal-header">
@@ -2095,13 +2118,15 @@ function mostrarHistorialPaciente(identificador) {
             </div>
             <div class="modal-body">
                 <p style="margin-bottom: 16px; color: var(--text-gray);">
-                    📞 ${citasPaciente[0].telefono} • ${citasPaciente.length} cita${citasPaciente.length !== 1 ? 's' : ''} registrada${citasPaciente.length !== 1 ? 's' : ''}
+                    🔍 Criterio: ${esBusquedaPorTelefono ? 'Teléfono' : 'Nombre'} • 📞 ${ultimoTel} • <strong>${totalCitas}</strong> cita${totalCitas !== 1 ? 's' : ''}
                 </p>
                 <div class="history-list">
                     ${citasPaciente.map(c => {
         const citaId = generarCitaId(c);
         const estado = getCitaEstado(citaId);
         const notas = getCitaNotas(citaId);
+        const estadoInfo = c.estado === 'cancelada' ? '❌ Cancelada' : (estado === 'confirmada' ? '✅ Confirmada' : '⏳ Pendiente');
+
         return `
                             <div class="history-item">
                                 <div class="history-date">📅 ${c.fechaTexto || 'Sin fecha'}</div>
@@ -2315,10 +2340,10 @@ function mostrarNotificaciones() {
         // Si no tiene fecha de creación (csv viejo), no podemos saber, asumimos falso para no molestar
         const esNueva = cita.creadoEn && cita.creadoEn > lastCheck;
 
-        const highlightStyle = esNueva ? 'background-color: rgba(72, 201, 176, 0.1); border-left: 3px solid var(--teal);' : 'border-left: 3px solid transparent;';
+        const highlightStyle = esNueva ? 'background-color: #e8f8f5; border-left: 4px solid #1abc9c;' : '';
 
         return `
-            <div class="notification-item" onclick="mostrarHistorialPaciente('${cita.paciente}')" style="padding: 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border); border-radius: 4px; ${highlightStyle} cursor: pointer;" title="Ver historial">
+            <div class="notification-item" onclick="mostrarHistorialPaciente('${obtenerIdPaciente(cita)}')" style="padding: 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border); border-radius: 4px; ${highlightStyle} cursor: pointer;" title="Ver historial">
                 <div style="display:flex; justify-content:space-between; align-items: flex-start; margin-bottom: 4px;">
                     <strong style="color: var(--text-dark);">${cita.paciente}</strong>
                     ${esNueva ? '<span style="font-size:0.7em; background:var(--teal); color:white; padding:2px 6px; border-radius:10px; font-weight:bold;">NUEVA</span>' : ''}
