@@ -1127,29 +1127,7 @@ function mostrarCitas(citas, containerId) {
 }
 
 // Acciones de citas
-function confirmarCita(citaId) {
-    setCitaEstado(citaId, 'confirmada');
-    showToast('Cita confirmada correctamente', 'success');
-    // Recargar vista actual
-    if (document.getElementById('view-citas').classList.contains('active')) {
-        cargarAgenda();
-    } else {
-        cargarDashboard();
-    }
-}
 
-async function cancelarCita(citaId) {
-    const confirmado = await showConfirm('¿Está seguro de cancelar esta cita?', 'Cancelar Cita');
-    if (confirmado) {
-        setCitaEstado(citaId, 'cancelada');
-        showToast('Cita cancelada', 'warning');
-        if (document.getElementById('view-citas').classList.contains('active')) {
-            cargarAgenda();
-        } else {
-            cargarDashboard();
-        }
-    }
-}
 
 // Obtener citas reagendadas de localStorage
 function getCitasReagendadas() {
