@@ -808,22 +808,29 @@
         </div>
     </div>
 
-    <!-- Modal Password Auth -->
+    <!-- Modal Password Auth - Premium -->
     <div id="modal-password-auth" class="modal-overlay" style="display: none; z-index: 2100;">
-        <div class="modal-content" style="max-width: 400px; text-align: center;">
-            <div class="modal-header" style="justify-content: center;">
-                <h3>🔒 Autorización Requerida</h3>
+        <div class="modal-content"
+            style="max-width: 420px; text-align: center; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);">
+            <div class="modal-header"
+                style="justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-bottom: none;">
+                <h3 style="color: white; font-size: 1.3rem; margin: 0;">🔒 Autorización Requerida</h3>
             </div>
-            <div class="modal-body">
-                <p style="margin-bottom: 15px; color: #555;">Acción protegida. Ingrese contraseña:</p>
+            <div class="modal-body" style="padding: 30px;">
+                <p style="margin-bottom: 20px; color: #4a5568; font-size: 1rem;">Acción protegida. Ingrese la contraseña
+                    de administrador:</p>
                 <div class="form-group">
                     <input type="password" id="auth-password" class="form-input" placeholder="Contraseña..."
-                        style="text-align: center;">
+                        style="text-align: center; padding: 14px 20px; font-size: 1.1rem; border-radius: 10px; border: 2px solid #e2e8f0; transition: all 0.3s ease;">
                 </div>
             </div>
-            <div class="modal-footer" style="justify-content: center;">
-                <button class="btn-secondary" onclick="cerrarModalPassword()">Cancelar</button>
-                <button class="btn-theme" onclick="verificarPasswordRestauracion()">Verificar</button>
+            <div class="modal-footer"
+                style="justify-content: center; gap: 15px; padding: 20px 30px 25px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                <button onclick="cerrarModalPassword()"
+                    style="padding: 12px 28px; border: 2px solid #cbd5e0; background: white; color: #4a5568; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">Cancelar</button>
+                <button onclick="verificarPasswordRestauracion()"
+                    style="padding: 12px 28px; border: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); transition: all 0.3s ease;">✓
+                    Verificar</button>
             </div>
         </div>
     </div>
