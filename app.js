@@ -156,7 +156,7 @@ function parsearCSV(csv) {
         telefono: headers.findIndex(h => h.includes('tel')),
         motivo: headers.findIndex(h => h.includes('motivo') && h.includes('principal')),
         especialidad: headers.findIndex(h => h.includes('especialidad')),
-        seguro: headers.findIndex(h => h.includes('seguro') && h.includes('privada')),
+        seguro: headers.findIndex(h => h.includes('seguro') || (h.includes('nombre') && h.includes('ars'))),
         timestamp: headers.findIndex(h => h.includes('marca') || h.includes('timestamp') || h.includes('tiempo'))
     };
 
@@ -205,6 +205,7 @@ function parsearCSV(csv) {
                 motivoPrincipal: motivoPrincipal || 'Consulta general',
                 especialidad: especialidad || 'No especificado',
                 tipoSeguro: tipoSeguroNormalizado,
+                nombreArs: (tipoSeguroNormalizado === 'Seguro Médico') ? tipoSeguro : 'Privada',
                 precio: precio,
                 estado: 'Solicitada',
                 creadoEn: fechaCreacion,
@@ -251,12 +252,26 @@ function calcularPrecio(especialidad, tipoSeguro, motivo) {
     return 0;
 }
 
+// Lista de ARS Homologadas
+const ARS_LISTA = [
+    'MAPFRE', 'Universal', 'Yunen', 'SENASA', 'Humano',
+    'ASEMAP', 'Futuro', 'META', 'Renacer', 'Reservas'
+];
+
 function normalizarSeguroSimple(valor) {
-    if (!valor) return 'No especificado';
+    if (!valor || valor.trim() === '') return 'Privada'; // Asumir privado si no selecciona seguro
+
     const lower = valor.toLowerCase();
-    if (lower.includes('seguro')) return 'Seguro Médico';
+
+    // Si coincide con alguna ARS conocida
+    if (ARS_LISTA.some(ars => lower.includes(ars.toLowerCase()))) {
+        return 'Seguro Médico';
+    }
+
+    if (lower.includes('seguro') && !lower.includes('no')) return 'Seguro Médico';
     if (lower.includes('privad')) return 'Privada';
-    return valor;
+
+    return 'Seguro Médico'; // Ante la duda, si hay texto, probablemente es un seguro
 }
 
 // Normalizar teléfono: eliminar todo excepto dígitos
@@ -1014,9 +1029,16 @@ async function cargarEstadisticas() {
     const seguros = contarOcurrencias(citasFiltradas, 'tipoSeguro');
     const motivos = contarOcurrencias(citasFiltradas, 'motivoPrincipal');
 
+    // Distribución de ARS (Solo seguros médicos)
+    const arsStats = contarOcurrencias(
+        citasFiltradas.filter(c => c.tipoSeguro === 'Seguro Médico'),
+        'nombreArs'
+    );
+
     // Renderizar gráficos interactivos (TODOS son clickeables ahora)
     renderizarBarrasInteractivas('chart-especialidades', especialidades, 'teal', 'especialidad');
     renderizarBarrasInteractivas('chart-seguro', seguros, 'coral', 'tipoSeguro');
+    renderizarBarrasInteractivas('chart-ars', arsStats, 'blue', 'ars'); // Nuevo gráfico ARS
     renderizarBarrasInteractivas('chart-motivos', motivos.slice(0, 10), 'purple', 'motivo');
 
     // ========================================
