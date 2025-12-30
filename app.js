@@ -2443,13 +2443,23 @@ function confirmarCancelacionFinal() {
 // Logs Lógica
 function registrarAuditoria(accion, detalle, metadata = {}) {
     try {
+        // Intentar recuperar usuario de memoria o storage para asegurar que no salga "Sistema"
+        let user = typeof usuarioActual !== 'undefined' ? usuarioActual : null;
+        if (!user) {
+            const stored = sessionStorage.getItem('usuario');
+            if (stored) user = JSON.parse(stored);
+        }
+
+        const nombreUsuario = user ? user.nombre : 'Sistema (No Logueado)';
+        const rolUsuario = user ? user.rol : 'N/A';
+
         const logs = JSON.parse(localStorage.getItem('auditLogs') || '[]');
         const nuevoLog = {
             id: Date.now(),
             fecha: new Date().toISOString(),
             fechaLocal: new Date().toLocaleString('es-DO'),
-            usuario: (window.usuarioActual && window.usuarioActual.nombre) ? window.usuarioActual.nombre : 'Sistema',
-            rol: (window.usuarioActual && window.usuarioActual.rol) ? window.usuarioActual.rol : 'N/A',
+            usuario: nombreUsuario,
+            rol: rolUsuario,
             accion: accion,
             detalle: detalle,
             metadata: metadata
@@ -2459,7 +2469,7 @@ function registrarAuditoria(accion, detalle, metadata = {}) {
         if (logs.length > 1000) logs.length = 1000;
 
         localStorage.setItem('auditLogs', JSON.stringify(logs));
-        console.log('Auditoría registrada:', accion);
+        console.log('Auditoría registrada:', accion, nombreUsuario);
     } catch (e) {
         console.error('Error guardando auditoría', e);
     }
