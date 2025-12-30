@@ -622,6 +622,107 @@ document.getElementById('btn-refresh')?.addEventListener('click', () => {
 });
 
 // ========================================
+// Lógica de Gestión de Citas (CRUD & Estados)
+// ========================================
+
+function generarCitaId(cita) {
+    if (cita.id) return String(cita.id);
+    // ID determinista basado en contenido si no hay ID único
+    return `${cita.fecha}-${cita.telefono}-${cita.paciente}`.replace(/[^a-zA-Z0-9]/g, '');
+}
+
+function getCitaEstado(citaId) {
+    const estados = JSON.parse(localStorage.getItem('citasEstados') || '{}');
+    return estados[citaId] || 'solicitada';
+}
+
+function setCitaEstado(citaId, estado) {
+    const estados = JSON.parse(localStorage.getItem('citasEstados') || '{}');
+    estados[citaId] = estado;
+    localStorage.setItem('citasEstados', JSON.stringify(estados));
+}
+
+function getCitasReagendadas() {
+    return JSON.parse(localStorage.getItem('citasReagendadas') || '[]');
+}
+
+async function confirmarCita(citaId) {
+    const confirmado = await showConfirm('¿Estás seguro de que deseas confirmar esta cita?', 'Confirmar Cita');
+    if (confirmado) {
+        setCitaEstado(citaId, 'confirmada');
+        showToast('Cita confirmada exitosamente', 'success');
+        recargarVistaActual();
+    }
+}
+
+async function cancelarCita(citaId) {
+    const confirmado = await showConfirm('¿Deseas cancelar esta cita? Esta acción no se puede deshacer.', 'Cancelar Cita');
+    if (confirmado) {
+        setCitaEstado(citaId, 'cancelada');
+        showToast('Cita cancelada', 'info');
+        recargarVistaActual();
+    }
+}
+
+function reagendarCita(citaId) {
+    // Usar DatePicker Modal existente
+    openDatePicker(null, (nuevaFecha) => {
+        if (nuevaFecha) {
+            const year = nuevaFecha.getFullYear();
+            const month = String(nuevaFecha.getMonth() + 1).padStart(2, '0');
+            const day = String(nuevaFecha.getDate()).padStart(2, '0');
+            const nuevaFechaStr = `${day}/${month}/${year}`; // Formato dd/mm/yyyy para compatibilidad visual
+
+            // Simulación de reagendado (guardar en localStorage para fusionar luego)
+            const lista = getCitasReagendadas();
+            // Buscar en todasLasCitas (ya sea array global o filtrado)
+            const citaOriginal = todasLasCitas.find(c => generarCitaId(c) === String(citaId));
+
+            if (citaOriginal) {
+                // Crear copia reagendada
+                const nuevaCita = { ...citaOriginal, fecha: nuevaFechaStr, fechaTexto: nuevaFechaStr, estado: 'reagendada_ok' };
+                // Asignar nuevo ID temporal para evitar colisiones
+                nuevaCita.id = 'R-' + Date.now();
+
+                lista.push(nuevaCita);
+                localStorage.setItem('citasReagendadas', JSON.stringify(lista));
+
+                // Marcar original como "reagendada" (oculta de vista normal o marcada)
+                setCitaEstado(citaId, 'reagendada');
+
+                showToast(`Cita reagendada para el ${nuevaFechaStr}`, 'success');
+                recargarVistaActual();
+            } else {
+                showToast('No se pudo encontrar los datos de la cita original', 'error');
+            }
+        }
+    });
+}
+
+function recargarVistaActual() {
+    if (document.getElementById('view-citas')?.classList.contains('active')) {
+        cargarAgenda();
+    } else if (document.getElementById('view-dashboard')?.classList.contains('active')) {
+        cargarDashboard();
+    } else {
+        // Fallback genérico
+        cargarAgenda();
+    }
+}
+
+function getInitials(nombre) {
+    if (!nombre) return '??';
+    return nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+}
+
+function formatearFechaLocal(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${day}/${month}/${year}`; // Usar formato display por defecto
+}
+
+// ========================================
 // Modal de Pacientes
 // ========================================
 
@@ -696,36 +797,78 @@ document.addEventListener('click', (e) => {
 // ========================================
 
 async function cargarAgenda() {
-    actualizarFechaDisplay();
-
     if (todasLasCitas.length === 0) {
         todasLasCitas = await cargarDatosDeGoogle();
     }
 
-    const fechaStr = formatearFechaLocal(fechaSeleccionada);
+    const filtroEl = document.getElementById('agenda-estado-filter');
+    const filtroEstado = filtroEl ? filtroEl.value : 'dia';
+    const btnPrev = document.getElementById('btn-prev-day');
+    const btnNext = document.getElementById('btn-next-day');
 
-    // Filtrar citas de Google Sheets que NO estén reagendadas
-    let citasFecha = todasLasCitas.filter(c => {
-        const citaId = generarCitaId(c);
-        const estado = getCitaEstado(citaId);
-        // Incluir si coincide la fecha Y no está reagendada
-        return c.fecha === fechaStr && estado !== 'reagendada';
-    });
+    if (filtroEstado !== 'dia') {
+        const titulos = {
+            todas: 'Historial Completo (Últimas 200)',
+            confirmada: 'Historial: Confirmadas',
+            cancelada: 'Historial: Canceladas',
+            reagendada: 'Historial: Reagendadas',
+            completada: 'Historial: Completadas'
+        };
+        document.getElementById('fecha-seleccionada').textContent = titulos[filtroEstado] || 'Historial Filtrado';
+        if (btnPrev) btnPrev.style.visibility = 'hidden';
+        if (btnNext) btnNext.style.visibility = 'hidden';
+    } else {
+        actualizarFechaDisplay();
+        if (btnPrev) btnPrev.style.visibility = 'visible';
+        if (btnNext) btnNext.style.visibility = 'visible';
+    }
 
-    // Agregar citas reagendadas a esta fecha
-    const citasReagendadas = getCitasReagendadas();
-    citasReagendadas.forEach(citaReag => {
-        if (citaReag.fecha === fechaStr) {
-            citasFecha.push(citaReag);
+    let citasFiltradas = [];
+
+    if (filtroEstado === 'dia') {
+        const fechaStr = formatearFechaLocal(fechaSeleccionada);
+        // Filtro standard por fecha
+        citasFiltradas = todasLasCitas.filter(c => {
+            const citaId = generarCitaId(c);
+            const estado = getCitaEstado(citaId);
+            return c.fecha === fechaStr && estado !== 'reagendada';
+        });
+
+        // Sumar reagendadas
+        const reagendadas = getCitasReagendadas();
+        reagendadas.forEach(c => {
+            if (c.fecha === fechaStr) citasFiltradas.push(c);
+        });
+
+    } else {
+        // Filtro Global
+        let universo = [...todasLasCitas, ...getCitasReagendadas()];
+
+        if (filtroEstado === 'todas') {
+            citasFiltradas = universo;
+        } else {
+            citasFiltradas = universo.filter(c => {
+                const id = generarCitaId(c);
+                const est = getCitaEstado(id);
+                // Incluir reagendadas activas (reagendada_ok) en filtro "Reagendada"
+                return est === filtroEstado || (filtroEstado === 'reagendada' && est === 'reagendada_ok');
+            });
         }
-    });
 
-    // Deduplicar citas: mismo teléfono + misma fecha = una sola cita
-    citasFecha = deduplicarCitas(citasFecha);
+        // Ordenar LIFO (recientes primero)
+        citasFiltradas.reverse();
+        // Limitar
+        if (citasFiltradas.length > 200) citasFiltradas = citasFiltradas.slice(0, 200);
+    }
 
-    document.getElementById('citas-count').textContent = `${citasFecha.length} cita${citasFecha.length !== 1 ? 's' : ''}`;
-    mostrarCitas(citasFecha, 'citas-agenda-lista');
+    // Deduplicar y Renderizar
+    citasFiltradas = deduplicarCitas(citasFiltradas);
+    document.getElementById('citas-count').textContent = `${citasFiltradas.length} cita${citasFiltradas.length !== 1 ? 's' : ''}`;
+    mostrarCitas(citasFiltradas, 'citas-agenda-lista');
 }
+
+// Listener para el filtro de agenda
+document.getElementById('agenda-estado-filter')?.addEventListener('change', () => cargarAgenda());
 
 function actualizarFechaDisplay() {
     // Actualizar texto
