@@ -88,6 +88,12 @@ function aplicarPermisosRol() {
     if (auditNav) {
         auditNav.style.display = esSecretaria ? 'none' : 'flex';
     }
+
+    // Finanzas solo Admin
+    const finNav = document.getElementById('nav-finanzas');
+    if (finNav) {
+        finNav.style.display = esSecretaria ? 'none' : 'flex';
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -127,6 +133,7 @@ function cambiarVista(vista) {
     if (vista === 'pacientes') cargarPacientes();
     if (vista === 'estadisticas') cargarEstadisticas();
     if (vista === 'auditoria') cargarAuditoria();
+    if (vista === 'finanzas') cargarFinanzas();
 }
 
 // ========================================
@@ -2690,7 +2697,6 @@ async function ejecutarRestauracion(citaId) {
 
     // Restaurar a Pendiente
     await setCitaEstado(citaId, 'pendiente');
-
     // Registrar Auditoría
     await registrarAuditoria('Restaurar Cita', 'Deshacer cancelación (Restaurada a Pendiente)', {
         citaId: citaId,
@@ -2700,3 +2706,248 @@ async function ejecutarRestauracion(citaId) {
     showToast('Cita restaurada correctamente', 'success');
     recargarVistaActual();
 }
+
+// ========================================
+// MÓDULO FINANCIERO (Solo Admin)
+// ========================================
+
+// Guardar Ingreso
+async function guardarIngreso() {
+    const monto = parseFloat(document.getElementById('fin-ingreso-monto').value);
+    const concepto = document.getElementById('fin-ingreso-concepto').value.trim();
+    const fecha = document.getElementById('fin-ingreso-fecha').value;
+
+    if (!monto || monto <= 0) {
+        showToast('Ingrese un monto válido', 'error');
+        return;
+    }
+    if (!concepto) {
+        showToast('Ingrese un concepto', 'error');
+        return;
+    }
+    if (!fecha) {
+        showToast('Seleccione una fecha', 'error');
+        return;
+    }
+
+    const payload = {
+        tipo: 'ingreso',
+        monto: monto,
+        concepto: concepto,
+        fecha: fecha,
+        ts: Date.now(),
+        usuario: usuarioActual?.nombre || 'Admin'
+    };
+
+    const id = `FIN_ING_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    await setCitaEstado(id, JSON.stringify(payload));
+
+    // Limpiar form
+    document.getElementById('fin-ingreso-monto').value = '';
+    document.getElementById('fin-ingreso-concepto').value = '';
+    document.getElementById('fin-ingreso-fecha').value = '';
+
+    showToast('Ingreso registrado correctamente', 'success');
+    cargarFinanzas();
+}
+
+// Guardar Gasto
+async function guardarGasto() {
+    const monto = parseFloat(document.getElementById('fin-gasto-monto').value);
+    const categoria = document.getElementById('fin-gasto-categoria').value;
+    const nota = document.getElementById('fin-gasto-nota').value.trim();
+    const fecha = document.getElementById('fin-gasto-fecha').value;
+
+    if (!monto || monto <= 0) {
+        showToast('Ingrese un monto válido', 'error');
+        return;
+    }
+    if (!categoria) {
+        showToast('Seleccione una categoría', 'error');
+        return;
+    }
+    if (!fecha) {
+        showToast('Seleccione una fecha', 'error');
+        return;
+    }
+
+    const payload = {
+        tipo: 'gasto',
+        monto: monto,
+        categoria: categoria,
+        nota: nota,
+        fecha: fecha,
+        ts: Date.now(),
+        usuario: usuarioActual?.nombre || 'Admin'
+    };
+
+    const id = `FIN_GAS_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    await setCitaEstado(id, JSON.stringify(payload));
+
+    // Limpiar form
+    document.getElementById('fin-gasto-monto').value = '';
+    document.getElementById('fin-gasto-categoria').value = '';
+    document.getElementById('fin-gasto-nota').value = '';
+    document.getElementById('fin-gasto-fecha').value = '';
+
+    showToast('Gasto registrado correctamente', 'success');
+    cargarFinanzas();
+}
+
+// Cargar Finanzas
+async function cargarFinanzas() {
+    const tbody = document.getElementById('lista-finanzas');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Cargando transacciones...</td></tr>';
+
+    // Sincronizar Cloud
+    await sincronizarEstados();
+    const estados = getCitasEstado();
+
+    // Extraer transacciones
+    let transacciones = [];
+    Object.keys(estados).forEach(key => {
+        if (key.startsWith('FIN_')) {
+            try {
+                const entry = estados[key];
+                if (entry && entry.estado && entry.estado.startsWith('{')) {
+                    const data = JSON.parse(entry.estado);
+                    transacciones.push({
+                        id: key,
+                        tipo: data.tipo,
+                        monto: data.monto || 0,
+                        concepto: data.concepto || data.categoria || '',
+                        categoria: data.categoria || '',
+                        nota: data.nota || '',
+                        fecha: data.fecha,
+                        ts: data.ts
+                    });
+                }
+            } catch (e) {
+                console.warn('Transacción inválida:', key);
+            }
+        }
+    });
+
+    // Aplicar filtros
+    const filtroTipo = document.getElementById('fin-filtro-tipo')?.value || 'todos';
+    const filtroMes = document.getElementById('fin-filtro-mes')?.value || '';
+
+    if (filtroTipo !== 'todos') {
+        transacciones = transacciones.filter(t => t.tipo === filtroTipo);
+    }
+    if (filtroMes) {
+        transacciones = transacciones.filter(t => t.fecha && t.fecha.startsWith(filtroMes));
+    }
+
+    // Ordenar por fecha descendente
+    transacciones.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+    // Calcular totales
+    let totalIngresos = 0;
+    let totalGastos = 0;
+    transacciones.forEach(t => {
+        if (t.tipo === 'ingreso') totalIngresos += t.monto;
+        if (t.tipo === 'gasto') totalGastos += t.monto;
+    });
+    const balance = totalIngresos - totalGastos;
+
+    document.getElementById('fin-total-ingresos').textContent = `RD$ ${formatearNumero(totalIngresos)}`;
+    document.getElementById('fin-total-gastos').textContent = `RD$ ${formatearNumero(totalGastos)}`;
+    document.getElementById('fin-balance').textContent = `RD$ ${formatearNumero(balance)}`;
+    document.getElementById('fin-balance').style.color = balance >= 0 ? '#27ae60' : '#e74c3c';
+
+    // Renderizar tabla
+    tbody.innerHTML = '';
+    if (transacciones.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; color: #888;">Sin transacciones registradas</td></tr>';
+        return;
+    }
+
+    transacciones.forEach(t => {
+        const row = document.createElement('tr');
+        const tipoColor = t.tipo === 'ingreso' ? '#27ae60' : '#e74c3c';
+        const tipoIcon = t.tipo === 'ingreso' ? '💵' : '📉';
+        const montoStyle = t.tipo === 'ingreso' ? 'color: #27ae60; font-weight: bold;' : 'color: #e74c3c; font-weight: bold;';
+
+        row.innerHTML = `
+            <td>${t.fecha || 'Sin fecha'}</td>
+            <td><span style="color: ${tipoColor};">${tipoIcon} ${t.tipo.charAt(0).toUpperCase() + t.tipo.slice(1)}</span></td>
+            <td>${t.concepto || t.categoria}</td>
+            <td style="font-size: 0.85em; color: #666; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${t.nota || '-'}</td>
+            <td style="${montoStyle}">RD$ ${formatearNumero(t.monto)}</td>
+            <td><button class="btn-sm btn-danger" onclick="eliminarTransaccion('${t.id}')" title="Eliminar">🗑️</button></td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Eliminar Transacción
+async function eliminarTransaccion(id) {
+    if (!confirm('¿Eliminar esta transacción?')) return;
+
+    // "Eliminar" = sobrescribir el estado con null/empty
+    await setCitaEstado(id, JSON.stringify({ deleted: true }));
+    showToast('Transacción eliminada', 'info');
+    cargarFinanzas();
+}
+
+// Limpiar Filtros
+function limpiarFiltrosFinanzas() {
+    document.getElementById('fin-filtro-tipo').value = 'todos';
+    document.getElementById('fin-filtro-mes').value = '';
+    cargarFinanzas();
+}
+
+// Exportar CSV
+async function exportarFinanzasCSV() {
+    await sincronizarEstados();
+    const estados = getCitasEstado();
+    const transacciones = [];
+
+    Object.keys(estados).forEach(key => {
+        if (key.startsWith('FIN_')) {
+            try {
+                const entry = estados[key];
+                const data = JSON.parse(entry.estado);
+                if (data.deleted) return;
+                transacciones.push({
+                    fecha: data.fecha,
+                    tipo: data.tipo,
+                    concepto: data.concepto || data.categoria,
+                    nota: data.nota || '',
+                    monto: data.monto
+                });
+            } catch (e) { }
+        }
+    });
+
+    if (transacciones.length === 0) {
+        showToast('No hay datos para exportar', 'warning');
+        return;
+    }
+
+    let csv = "data:text/csv;charset=utf-8,";
+    csv += "Fecha,Tipo,Concepto,Nota,Monto\n";
+    transacciones.forEach(t => {
+        const notaSafe = (t.nota || '').replace(/"/g, '""');
+        csv += `${t.fecha},${t.tipo},"${t.concepto}","${notaSafe}",${t.monto}\n`;
+    });
+
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csv));
+    link.setAttribute("download", `finanzas_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Exponer funciones globalmente
+window.guardarIngreso = guardarIngreso;
+window.guardarGasto = guardarGasto;
+window.cargarFinanzas = cargarFinanzas;
+window.eliminarTransaccion = eliminarTransaccion;
+window.limpiarFiltrosFinanzas = limpiarFiltrosFinanzas;
+window.exportarFinanzasCSV = exportarFinanzasCSV;
+
