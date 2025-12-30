@@ -175,7 +175,9 @@ function parsearCSV(csv) {
         especialidad: headers.findIndex(h => h.includes('especialidad')),
         seguroNombre: idxSeguroNombre,
         seguroTipo: idxSeguroTipo,
-        timestamp: headers.findIndex(h => h.includes('marca') || h.includes('timestamp') || h.includes('tiempo'))
+        timestamp: headers.findIndex(h => h.includes('marca') || h.includes('timestamp') || h.includes('tiempo')),
+        edad: headers.findIndex(h => h.includes('edad')),
+        numeroAfiliado: headers.findIndex(h => h.includes('afiliado') || h.includes('número de afiliado'))
     };
 
     console.log('=== ÍNDICES DE COLUMNAS ===', colIndices);
@@ -194,6 +196,8 @@ function parsearCSV(csv) {
         const valSeguroTipo = (colIndices.seguroTipo !== -1) ? (valores[colIndices.seguroTipo] || '').trim() : '';
         const rawSeguro = valSeguroNombre || valSeguroTipo; // Priorizar nombre, fallback a tipo
         const timestampStr = (colIndices.timestamp !== -1) ? (valores[colIndices.timestamp] || '') : '';
+        const edadPaciente = (colIndices.edad !== -1) ? (valores[colIndices.edad] || '').trim() : '';
+        const numeroAfiliado = (colIndices.numeroAfiliado !== -1) ? (valores[colIndices.numeroAfiliado] || '').trim() : '';
 
         // Parsear fecha de creación para ordenamiento y display
         let fechaCreacion = new Date(0);
@@ -262,7 +266,9 @@ function parsearCSV(csv) {
                 precio: precio,
                 estado: 'Solicitada',
                 creadoEn: fechaCreacion,
-                creadoEnTexto: timestampStr
+                creadoEnTexto: timestampStr,
+                edad: edadPaciente || 'No especificada',
+                numeroAfiliado: numeroAfiliado || ''
             });
         }
     }
@@ -1143,9 +1149,11 @@ function mostrarCitas(citas, containerId) {
                 <div class="cita-info">
                     <div class="cita-nombre">${cita.paciente}</div>
                     <div class="cita-detalle">📞 ${cita.telefono}</div>
+                    <div class="cita-detalle">🎂 Edad: ${cita.edad}</div>
                     <div class="cita-detalle">🩺 ${cita.especialidad}</div>
                     <div class="cita-detalle">📋 ${cita.motivoPrincipal}</div>
-                    <div class="cita-detalle">💳 ${cita.tipoSeguro}</div>
+                    <div class="cita-detalle">💳 ${cita.tipoSeguro}${cita.tipoSeguro === 'Seguro Médico' && cita.nombreArs ? ' - ' + cita.nombreArs : ''}</div>
+                    ${cita.tipoSeguro === 'Seguro Médico' && cita.numeroAfiliado ? `<div class="cita-detalle">🆔 Afiliado: ${cita.numeroAfiliado}</div>` : ''}
                     <div class="cita-detalle">📅 ${cita.fechaTexto || 'Sin fecha'}</div>
                     ${notasHTML}
                     <button class="btn-add-note" onclick="agregarNota('${citaId}')">📝 Agregar nota</button>
