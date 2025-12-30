@@ -2954,8 +2954,16 @@ function renderizarResumenMensual(estados) {
     tbodyMensual.innerHTML = '';
     if (mesesArr.length === 0) {
         tbodyMensual.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 15px; color: #888;">Sin datos mensuales</td></tr>';
+        // Hide dashboard if no data
+        if (document.getElementById('fin-dashboard')) {
+            document.getElementById('fin-dashboard').style.display = 'none';
+        }
         return;
     }
+
+    // Initialize KPI Totals
+    let totalIngresoGlobal = 0;
+    let totalGastoGlobal = 0;
 
     mesesArr.forEach(mesKey => {
         const datos = porMes[mesKey];
