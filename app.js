@@ -205,7 +205,7 @@ function parsearCSV(csv) {
                 motivoPrincipal: motivoPrincipal || 'Consulta general',
                 especialidad: especialidad || 'No especificado',
                 tipoSeguro: tipoSeguroNormalizado,
-                nombreArs: (tipoSeguroNormalizado === 'Seguro Médico') ? tipoSeguro : 'Privada',
+                nombreArs: (tipoSeguroNormalizado === 'Seguro Médico') ? normalizarNombreARS(tipoSeguro) : 'N/A',
                 precio: precio,
                 estado: 'Solicitada',
                 creadoEn: fechaCreacion,
@@ -254,24 +254,50 @@ function calcularPrecio(especialidad, tipoSeguro, motivo) {
 
 // Lista de ARS Homologadas
 const ARS_LISTA = [
-    'MAPFRE', 'Universal', 'Yunen', 'SENASA', 'Humano',
-    'ASEMAP', 'Futuro', 'META', 'Renacer', 'Reservas'
+    'MAPFRE Salud ARS, S.A.', 'ARS Universal, S.A.', 'Yunen ARS, S.A.',
+    'Seguro Nacional de Salud (SENASA)', 'ARS Humano, S.A.',
+    'ARS ASEMAP', 'ARS Futuro', 'META Salud ARS', 'ARS Renacer', 'ARS Reservas'
 ];
 
+function normalizarNombreARS(valor) {
+    if (!valor || valor.trim() === '') return 'Privada';
+    const v = valor.toLowerCase();
+
+    // Mapeos inteligentes (Keywords -> Nombre Oficial)
+    if (v.includes('mapfre') || v.includes('palic')) return 'MAPFRE Salud ARS, S.A.';
+    if (v.includes('universal')) return 'ARS Universal, S.A.';
+    if (v.includes('yunen')) return 'Yunen ARS, S.A.';
+    if (v.includes('senasa') || v.includes('nacional')) return 'Seguro Nacional de Salud (SENASA)';
+    if (v.includes('humano') || v.includes('primera')) return 'ARS Humano, S.A.';
+    if (v.includes('asemap')) return 'ARS ASEMAP';
+    if (v.includes('futuro')) return 'ARS Futuro';
+    if (v.includes('meta')) return 'META Salud ARS';
+    if (v.includes('renacer') || v.includes('monumental')) return 'ARS Renacer';
+    if (v.includes('reservas')) return 'ARS Reservas';
+
+    // Genéricos
+    if (v.includes('seguro') || v === 'si') return 'Seguro Genérico (No especificado)';
+
+    return valor; // Retornar valor original como último recurso
+}
+
 function normalizarSeguroSimple(valor) {
-    if (!valor || valor.trim() === '') return 'Privada'; // Asumir privado si no selecciona seguro
+    if (!valor || valor.trim() === '') return 'Privada';
 
-    const lower = valor.toLowerCase();
+    // Intentar detectar nombre de ARS
+    const nombreNormalizado = normalizarNombreARS(valor);
 
-    // Si coincide con alguna ARS conocida
-    if (ARS_LISTA.some(ars => lower.includes(ars.toLowerCase()))) {
+    // Si se detectó una ARS oficial o Genérica
+    if (ARS_LISTA.includes(nombreNormalizado) || nombreNormalizado === 'Seguro Genérico (No especificado)') {
         return 'Seguro Médico';
     }
 
+    // Fallbacks
+    const lower = valor.toLowerCase();
     if (lower.includes('seguro') && !lower.includes('no')) return 'Seguro Médico';
-    if (lower.includes('privad')) return 'Privada';
+    if (lower.includes('privad') || lower.includes('particular')) return 'Privada';
 
-    return 'Seguro Médico'; // Ante la duda, si hay texto, probablemente es un seguro
+    return 'Privada';
 }
 
 // Normalizar teléfono: eliminar todo excepto dígitos
