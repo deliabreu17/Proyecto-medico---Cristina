@@ -149,14 +149,18 @@ function parsearCSV(csv) {
     console.log('=== HEADERS ENCONTRADOS ===');
     headers.forEach((h, i) => console.log(`${i}: "${h}"`));
 
-    // Encontrar índices de columnas con búsqueda más flexible
+    // Detección avanzada de columnas de seguro
+    const idxSeguroNombre = headers.findIndex(h => (h.includes('nombre') && h.includes('seguro')) || h.includes('ars') || h.includes('aseguradora'));
+    const idxSeguroTipo = headers.findIndex(h => h.includes('privada') || (h.includes('seguro') && !h.includes('nombre')));
+
     const colIndices = {
         nombre: headers.findIndex(h => h.includes('nombre') && (h.includes('paciente') || h.includes('completo'))),
         fecha: headers.findIndex(h => h.includes('fecha')),
         telefono: headers.findIndex(h => h.includes('tel')),
         motivo: headers.findIndex(h => h.includes('motivo') && h.includes('principal')),
         especialidad: headers.findIndex(h => h.includes('especialidad')),
-        seguro: headers.findIndex(h => h.includes('seguro') || (h.includes('nombre') && h.includes('ars'))),
+        seguroNombre: idxSeguroNombre,
+        seguroTipo: idxSeguroTipo,
         timestamp: headers.findIndex(h => h.includes('marca') || h.includes('timestamp') || h.includes('tiempo'))
     };
 
@@ -172,7 +176,9 @@ function parsearCSV(csv) {
         const telefono = (valores[colIndices.telefono] || '').trim();
         const motivoPrincipal = (valores[colIndices.motivo] || '').trim();
         const especialidad = (valores[colIndices.especialidad] || '').trim();
-        const tipoSeguro = (valores[colIndices.seguro] || '').trim();
+        const valSeguroNombre = (colIndices.seguroNombre !== -1) ? (valores[colIndices.seguroNombre] || '').trim() : '';
+        const valSeguroTipo = (colIndices.seguroTipo !== -1) ? (valores[colIndices.seguroTipo] || '').trim() : '';
+        const rawSeguro = valSeguroNombre || valSeguroTipo; // Priorizar nombre, fallback a tipo
         const timestampStr = (colIndices.timestamp !== -1) ? (valores[colIndices.timestamp] || '') : '';
 
         // Parsear fecha de creación para ordenamiento
@@ -193,7 +199,23 @@ function parsearCSV(csv) {
         }
 
         if (nombre) {
-            const tipoSeguroNormalizado = normalizarSeguroSimple(tipoSeguro);
+            const tipoSeguroNormalizado = normalizarSeguroSimple(rawSeguro);
+
+            // Lógica de Homologación ARS Avanzada
+            let nombreArsReal = 'N/A';
+            if (tipoSeguroNormalizado === 'Seguro Médico') {
+                nombreArsReal = normalizarNombreARS(rawSeguro);
+                // Si con el valor principal no encontramos ARS, intentamos con el otro campo si existe
+                if (nombreArsReal === 'Seguro Genérico (No especificado)' && valSeguroTipo && valSeguroTipo !== rawSeguro) {
+                    const intento = normalizarNombreARS(valSeguroTipo);
+                    if (intento !== 'Seguro Genérico (No especificado)' && intento !== 'Privada') {
+                        nombreArsReal = intento;
+                    }
+                }
+            } else {
+                nombreArsReal = 'Privada';
+            }
+
             const precio = calcularPrecio(especialidad, tipoSeguroNormalizado, motivoPrincipal);
 
             citas.push({
@@ -205,7 +227,7 @@ function parsearCSV(csv) {
                 motivoPrincipal: motivoPrincipal || 'Consulta general',
                 especialidad: especialidad || 'No especificado',
                 tipoSeguro: tipoSeguroNormalizado,
-                nombreArs: (tipoSeguroNormalizado === 'Seguro Médico') ? normalizarNombreARS(tipoSeguro) : 'N/A',
+                nombreArs: nombreArsReal,
                 precio: precio,
                 estado: 'Solicitada',
                 creadoEn: fechaCreacion,
