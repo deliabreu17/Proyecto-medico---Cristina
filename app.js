@@ -3114,25 +3114,55 @@ function renderFinanzaChart(resumenMensual) {
     });
 }
 
-// Eliminar Transacción
-async function eliminarTransaccion(id) {
-    console.log('Intentando eliminar:', id);
+// Eliminar Transacción - Direct approach
+function eliminarTransaccion(id) {
+    console.log('[DEBUG] eliminarTransaccion called with id:', id);
 
-    const confirmar = confirm('¿Eliminar esta transacción?');
-    if (!confirmar) {
-        console.log('Cancelado por usuario');
+    if (!id) {
+        console.error('[ERROR] ID vacío');
+        return;
+    }
+
+    const confirmado = window.confirm('¿Eliminar esta transacción?');
+    console.log('[DEBUG] Usuario confirmó:', confirmado);
+
+    if (!confirmado) {
         return;
     }
 
     try {
-        // "Eliminar" = sobrescribir el estado con deleted:true
-        await setCitaEstado(id, JSON.stringify({ deleted: true }));
-        console.log('Transacción eliminada exitosamente:', id);
-        showToast('Transacción eliminada', 'info');
-        await cargarFinanzas();
+        // Obtener estados actuales
+        const estadosStr = localStorage.getItem('citasEstado') || '{}';
+        const estados = JSON.parse(estadosStr);
+
+        console.log('[DEBUG] Estados antes:', Object.keys(estados).length);
+
+        // Marcar como eliminado
+        estados[id] = {
+            estado: JSON.stringify({ deleted: true }),
+            fecha: new Date().toISOString()
+        };
+
+        // Guardar de vuelta
+        localStorage.setItem('citasEstado', JSON.stringify(estados));
+
+        console.log('[DEBUG] Transacción marcada como eliminada:', id);
+
+        // Mostrar toast
+        if (typeof showToast === 'function') {
+            showToast('Transacción eliminada', 'info');
+        } else {
+            alert('Transacción eliminada');
+        }
+
+        // Recargar la tabla
+        if (typeof cargarFinanzas === 'function') {
+            cargarFinanzas();
+        }
+
     } catch (error) {
-        console.error('Error al eliminar transacción:', error);
-        showToast('Error al eliminar la transacción', 'error');
+        console.error('[ERROR] Error al eliminar:', error);
+        alert('Error al eliminar la transacción: ' + error.message);
     }
 }
 
