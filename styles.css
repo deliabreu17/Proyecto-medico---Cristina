@@ -3033,3 +3033,23 @@ body.dark-mode .modal-content {
     margin-top: 20px;
 }
 
+
+/* Chart Size Adjustment */
+.chart-container-premium {
+    height: 280px !important;
+}
+.fin-dashboard-grid {
+    gap: 15px !important;
+}
+.kpi-card {
+    padding: 15px 20px !important;
+}
+.kpi-icon {
+    width: 50px !important;
+    height: 50px !important;
+    font-size: 1.5rem !important;
+}
+.kpi-info p {
+    font-size: 1.4rem !important;
+}
+
