@@ -2838,6 +2838,13 @@ async function cargarFinanzas() {
                 const entry = estados[key];
                 if (entry && entry.estado && entry.estado.startsWith('{')) {
                     const data = JSON.parse(entry.estado);
+
+                    // Skip deleted transactions
+                    if (data.deleted === true) {
+                        console.log('[FINANZAS] Skipping deleted transaction:', key);
+                        return;
+                    }
+
                     transacciones.push({
                         id: key,
                         tipo: data.tipo,
