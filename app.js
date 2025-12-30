@@ -2068,18 +2068,28 @@ function mostrarHistorialPaciente(identificador) {
     // Si no, es búsqueda por nombre.
     const esBusquedaPorTelefono = /^\d+$/.test(idStr) && idStr.length >= 6;
 
-    // Buscar todas las citas que coincidan
-    const citasPaciente = todasLasCitas.filter(c => {
-        if (esBusquedaPorTelefono) {
-            return normalizarTelefono(c.telefono) === idStr;
+    // Estrategia de búsqueda refinada (Two-Pass)
+    let citasFiltradas = [];
+
+    if (esBusquedaPorTelefono) {
+        // Búsqueda exacta por teléfono
+        citasFiltradas = todasLasCitas.filter(c => normalizarTelefono(c.telefono) === idStr);
+    } else {
+        // Búsqueda por Nombre (Prioridad Exacta vs Parcial)
+
+        // Paso 1: Intentar Exact Match (Luis === Luis)
+        const exactMatches = todasLasCitas.filter(c => c.paciente.toLowerCase() === idStr);
+
+        if (exactMatches.length > 0) {
+            // Si encontramos al paciente exacto, ignoramos los parciales (Luis ignora a Luisa)
+            citasFiltradas = exactMatches;
         } else {
-            // Búsqueda por Nombre (usamos includes para flexibilidad o exacto?)
-            // Si el ID vino del helper 'obtenerIdPaciente', es el nombre exacto.
-            // Pero si el usuario escribió "Luis" en el buscador, es parcial.
-            // Usamos includes para soportar buscador, pero con cuidado.
-            return c.paciente.toLowerCase().includes(idStr);
+            // Paso 2: Fallback a Parcial (para el buscador global "Lui...")
+            citasFiltradas = todasLasCitas.filter(c => c.paciente.toLowerCase().includes(idStr));
         }
-    });
+    }
+
+    const citasPaciente = citasFiltradas; // Alias para compatibilidad con resto de fn
 
     if (citasPaciente.length === 0) {
         showToast('No se encontró historial con ese criterio', 'warning');
