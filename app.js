@@ -650,11 +650,7 @@ function getCitaEstado(citaId) {
     return estados[citaId] || 'solicitada';
 }
 
-function setCitaEstado(citaId, estado) {
-    const estados = JSON.parse(localStorage.getItem('citasEstados') || '{}');
-    estados[citaId] = estado;
-    localStorage.setItem('citasEstados', JSON.stringify(estados));
-}
+// setCitaEstado is defined later as async function with cloud sync (line ~1019)
 
 function getCitasReagendadas() {
     return JSON.parse(localStorage.getItem('citasReagendadas') || '[]');
