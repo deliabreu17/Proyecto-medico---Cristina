@@ -2440,10 +2440,9 @@ function confirmarCancelacionFinal() {
     }
 }
 
-// Logs Lógica
-function registrarAuditoria(accion, detalle, metadata = {}) {
+// Logs Lógica (CLOUDIZÉO)
+async function registrarAuditoria(accion, detalle, metadata = {}) {
     try {
-        // Intentar recuperar usuario de memoria o storage para asegurar que no salga "Sistema"
         let user = typeof usuarioActual !== 'undefined' ? usuarioActual : null;
         if (!user) {
             const stored = sessionStorage.getItem('usuario');
@@ -2453,78 +2452,139 @@ function registrarAuditoria(accion, detalle, metadata = {}) {
         const nombreUsuario = user ? user.nombre : 'Sistema (No Logueado)';
         const rolUsuario = user ? user.rol : 'N/A';
 
-        const logs = JSON.parse(localStorage.getItem('auditLogs') || '[]');
-        const nuevoLog = {
-            id: Date.now(),
-            fecha: new Date().toISOString(),
-            fechaLocal: new Date().toLocaleString('es-DO'),
-            usuario: nombreUsuario,
-            rol: rolUsuario,
-            accion: accion,
-            detalle: detalle,
-            metadata: metadata
+        // Payload optimizado para transporte
+        const logPayload = {
+            u: nombreUsuario,
+            r: rolUsuario,
+            a: accion,
+            d: detalle,
+            ts: Date.now()
         };
-        logs.unshift(nuevoLog); // LIFO
-        // Limpiar antiguos (>1000)
-        if (logs.length > 1000) logs.length = 1000;
 
-        localStorage.setItem('auditLogs', JSON.stringify(logs));
-        console.log('Auditoría registrada:', accion, nombreUsuario);
+        // Generar ID único (Prefijo LOG_)
+        // Random incluido para evitar colisiones entre PCs
+        const logId = `LOG_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        // Guardar en la "Nube" usando el endpoint de estados existente
+        // Aprovechamos que el backend acepta strings arbitrarios como estado
+        await setCitaEstado(logId, JSON.stringify(logPayload));
+
+        console.log('Auditoría Cloud registrada:', accion);
     } catch (e) {
-        console.error('Error guardando auditoría', e);
+        console.error('Error guardando auditoría cloud', e);
     }
 }
 
-function cargarAuditoria() {
-    const logs = JSON.parse(localStorage.getItem('auditLogs') || '[]');
+async function cargarAuditoria() {
     const tbody = document.getElementById('lista-auditoria');
     if (!tbody) return;
 
-    tbody.innerHTML = '';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; color: var(--text-gray);"><span class="sync-indicator" style="display:inline-block; margin-right:5px;"></span>Cargando historial remoto...</td></tr>';
 
-    if (logs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; color: var(--text-gray);">Sin registros de actividad reciente</td></tr>';
-        return;
+    try {
+        // 1. Forzar sincronización para asegurar datos frescos de otras PCs
+        await sincronizarEstados();
+
+        // 2. Obtener mapa completo y filtrar logs
+        const estados = getCitasEstado();
+        const logs = [];
+
+        Object.keys(estados).forEach(key => {
+            if (key.toString().startsWith('LOG_')) {
+                try {
+                    const entry = estados[key];
+                    // El contenido real está en la propiedad 'estado' como string JSON
+                    // OJO: entry = { estado: "JSON", fecha: "ISO" }
+                    // A veces puede venir sucio, validamos
+                    if (entry && entry.estado && entry.estado.startsWith('{')) {
+                        const content = JSON.parse(entry.estado);
+                        logs.push({
+                            id: key,
+                            fecha: new Date(content.ts || entry.fecha),
+                            usuario: content.u || 'Desconocido',
+                            rol: content.r || 'N/A',
+                            accion: content.a || 'Acción',
+                            detalle: content.d || ''
+                        });
+                    }
+                } catch (parseErr) {
+                    console.warn('Log corrupto ignorado:', key);
+                }
+            }
+        });
+
+        // 3. Ordenar cronológicamente (Reciente primero)
+        logs.sort((a, b) => b.fecha - a.fecha);
+
+        // 4. Renderizar
+        tbody.innerHTML = '';
+
+        if (logs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; color: var(--text-gray);">Sin registros de actividad en la nube</td></tr>';
+            return;
+        }
+
+        logs.forEach(log => {
+            const row = document.createElement('tr');
+            const fechaStr = log.fecha.toLocaleDateString('es-DO');
+            const horaStr = log.fecha.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+
+            const badgeClass = log.rol === 'Administrador' ? 'badge-admin' : (log.rol === 'Secretaria' ? 'badge-secretaria' : 'badge-neutral');
+
+            row.innerHTML = `
+                <td>${fechaStr}</td>
+                <td>${horaStr}</td>
+                <td><strong>${log.usuario}</strong></td>
+                <td><span class="badge ${badgeClass}">${log.rol}</span></td>
+                <td>${log.accion}</td>
+                <td style="font-size: 0.9em; color: #555;">${log.detalle}</td>
+            `;
+            tbody.appendChild(row);
+        });
+
+    } catch (e) {
+        console.error('Error cargando audit:', e);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: #e74c3c; padding: 20px;">Error de conexión. Intente refrescar.</td></tr>';
     }
-
-    logs.forEach(log => {
-        const row = document.createElement('tr');
-        // Fecha display simple
-        const d = new Date(log.fecha);
-        const fechaStr = d.toLocaleDateString('es-DO');
-        const horaStr = d.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
-
-        const badgeClass = log.rol === 'Administrador' ? 'badge-admin' : (log.rol === 'Secretaria' ? 'badge-secretaria' : 'badge-neutral');
-
-        row.innerHTML = `
-            <td>${fechaStr}</td>
-            <td>${horaStr}</td>
-            <td><strong>${log.usuario}</strong></td>
-            <td><span class="badge ${badgeClass}">${log.rol}</span></td>
-            <td>${log.accion}</td>
-            <td style="font-size: 0.9em; color: #555;">${log.detalle}</td>
-        `;
-        tbody.appendChild(row);
-    });
 }
 
-function exportarAuditoriaCSV() {
-    const logs = JSON.parse(localStorage.getItem('auditLogs') || '[]');
+async function exportarAuditoriaCSV() {
+    await sincronizarEstados();
+    const estados = getCitasEstado();
+    const logs = [];
+
+    // Reutilizar lógica de extracción
+    Object.keys(estados).forEach(key => {
+        if (key.toString().startsWith('LOG_')) {
+            try {
+                const entry = estados[key];
+                const content = JSON.parse(entry.estado);
+                logs.push({
+                    fecha: new Date(content.ts || entry.fecha),
+                    usuario: content.u,
+                    rol: content.r,
+                    accion: content.a,
+                    detalle: content.d
+                });
+            } catch (e) { }
+        }
+    });
+
+    logs.sort((a, b) => b.fecha - a.fecha);
+
     if (logs.length === 0) {
-        showToast('No hay datos para exportar', 'warning');
+        showToast('No hay datos en la nube para exportar', 'warning');
         return;
     }
 
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "ID,FechaISO,FechaLocal,Usuario,Rol,Accion,Detalle\n";
+    csvContent += "FechaISO,FechaLocal,Usuario,Rol,Accion,Detalle\n";
 
     logs.forEach(log => {
-        // Escapar comillas
         const detalleSafe = (log.detalle || '').replace(/"/g, '""');
         const row = [
-            log.id,
-            log.fecha,
-            `"${log.fechaLocal}"`,
+            log.fecha.toISOString(),
+            `"${log.fecha.toLocaleString('es-DO')}"`,
             `"${log.usuario}"`,
             log.rol,
             `"${log.accion}"`,
@@ -2536,9 +2596,8 @@ function exportarAuditoriaCSV() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `auditoria_sistema_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", `auditoria_cloud_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 }
-
