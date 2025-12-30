@@ -2702,3 +2702,90 @@ body.dark-mode .modal-content {
         justify-content: center;
     }
 }
+/* ========================================
+   Print Styles (A4)
+   ======================================== */
+@media print {
+    @page {
+        size: A4;
+        margin: 1cm;
+    }
+
+    body {
+        background-color: white;
+        height: auto;
+        width: 100%;
+        overflow: visible;
+    }
+
+    /* Ocultar sidebar y elementos no imprimibles */
+    .sidebar, .mobile-menu-toggle, .btn-secondary, .sync-controls, 
+    .notification-badge, .search-box, .date-nav button, .btn-accion, 
+    .btn-add-note, .global-search-container, #btn-imprimir, .theme-toggle,
+    .floating-action-btn, #btn-refresh, #btn-refresh-stats {
+        display: none !important;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .page-header {
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #ccc;
+    }
+
+    /* Compactar items de agenda */
+    .cita-item {
+        break-inside: avoid;
+        border: 1px solid #ddd;
+        box-shadow: none;
+        padding: 8px;
+        margin-bottom: 8px;
+        page-break-inside: avoid;
+    }
+
+    .cita-avatar {
+        width: 30px;
+        height: 30px;
+        font-size: 12px;
+    }
+
+    .cita-info {
+        font-size: 11px;
+    }
+
+    .cita-nombre {
+        font-size: 14px;
+        margin-bottom: 2px;
+    }
+
+    .cita-detalle {
+        margin-bottom: 2px;
+    }
+
+    /* Stats Grid en Impresión - Ajustar a fila */
+    .stats-grid {
+        display: flex !important;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .stat-card {
+        flex: 1;
+        min-width: 100px;
+        border: 1px solid #ccc;
+        box-shadow: none;
+        padding: 10px;
+    }
+
+    /* Asegurar textos oscuros */
+    h1, h2, h3, p, span, div, strong {
+        color: black !important;
+    }
+}

@@ -1831,11 +1831,23 @@ function guardarNotaModal() {
 // ========================================
 // Historial de Paciente
 // ========================================
-function mostrarHistorialPaciente(telefonoNorm) {
-    // Buscar todas las citas de este paciente
-    const citasPaciente = todasLasCitas.filter(c =>
-        normalizarTelefono(c.telefono) === telefonoNorm
-    );
+function mostrarHistorialPaciente(identificador) {
+    if (!identificador) return;
+    const idStr = String(identificador).toLowerCase().trim();
+
+    // Buscar todas las citas que coincidan por Teléfono o Nombre
+    const citasPaciente = todasLasCitas.filter(c => {
+        const telNorm = normalizarTelefono(c.telefono);
+        const nombreLower = c.paciente.toLowerCase();
+
+        // Match exacto teléfono
+        if (telNorm === idStr) return true;
+
+        // Match nombre (flexible)
+        if (nombreLower.includes(idStr)) return true;
+
+        return false;
+    });
 
     if (citasPaciente.length === 0) {
         showToast('No se encontró historial para este paciente', 'warning');
