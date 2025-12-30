@@ -1,58 +1,171 @@
 /* =========================================
-   Auditoría View Styles
+   Auditoría & Modal Styles
    ========================================= */
+
+/* Badges */
 .badge-admin {
     background-color: #6C5CE7;
-    /* Morado Admin */
     color: white;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 0.85em;
-    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+    letter-spacing: 0.5px;
 }
 
 .badge-secretaria {
     background-color: #00CEC9;
-    /* Cyan Secretaria */
     color: white;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 0.85em;
-    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+    letter-spacing: 0.5px;
 }
 
 .badge-neutral {
     background-color: #95a5a6;
     color: white;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 0.85em;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
 }
 
-.header-actions {
-    display: flex;
-    gap: 10px;
-    align-items: center;
+/* Tabla Auditoría */
+.table-container {
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    background: white;
+    overflow: hidden;
 }
 
 #tabla-auditoria {
-    border-collapse: collapse;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 #tabla-auditoria th {
     background-color: #f8f9fa;
-    color: var(--text-dark);
+    color: #444;
     font-weight: 600;
-    position: sticky;
-    top: 0;
+    padding: 15px;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    border-bottom: 2px solid #eee;
 }
 
 #tabla-auditoria td {
-    padding: 12px 15px;
-    border-bottom: 1px solid #eee;
-    color: var(--text-dark);
+    padding: 15px;
+    border-bottom: 1px solid #f0f0f0;
+    color: #555;
+    font-size: 0.95rem;
+    vertical-align: middle;
+}
+
+#tabla-auditoria tr:last-child td {
+    border-bottom: none;
 }
 
 #tabla-auditoria tr:hover {
     background-color: #fcfcfc;
+}
+
+/* Modal Cancelación Mejorado */
+#modal-cancelacion .modal-content {
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    border: none;
+    font-family: 'Outfit', sans-serif;
+    padding: 0;
+    overflow: hidden;
+}
+
+#modal-cancelacion .modal-header {
+    background: linear-gradient(135deg, #fff5f5 0%, #fff 100%);
+    padding: 20px 24px;
+    border-bottom: 1px solid #ffecec;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+#modal-cancelacion .modal-header h3 {
+    color: #e74c3c;
+    font-size: 1.25rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#modal-cancelacion .modal-body {
+    padding: 24px;
+}
+
+#modal-cancelacion .form-group {
+    margin-bottom: 20px;
+}
+
+#modal-cancelacion label {
+    color: #333;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    display: block;
+}
+
+#modal-cancelacion .form-input {
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#modal-cancelacion .form-input:focus {
+    border-color: #e74c3c;
+    /* Red focus for cancellation */
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
+}
+
+#modal-cancelacion .modal-footer {
+    background-color: #f9f9f9;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    border-top: 1px solid #eee;
+}
+
+#modal-cancelacion .btn-secondary {
+    background: white;
+    border: 1px solid #ddd;
+    color: #555;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#modal-cancelacion .btn-danger {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(231, 76, 60, 0.2);
+    transition: all 0.2s;
+}
+
+#modal-cancelacion .btn-danger:hover {
+    background: #c0392b;
+    transform: translateY(-1px);
 }

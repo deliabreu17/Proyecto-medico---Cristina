@@ -126,6 +126,7 @@ function cambiarVista(vista) {
     if (vista === 'citas') cargarAgenda();
     if (vista === 'pacientes') cargarPacientes();
     if (vista === 'estadisticas') cargarEstadisticas();
+    if (vista === 'auditoria') cargarAuditoria();
 }
 
 // ========================================
