@@ -2881,6 +2881,80 @@ async function cargarFinanzas() {
         `;
         tbody.appendChild(row);
     });
+
+    // Renderizar Resumen Mensual (usa todas las transacciones, sin filtro de tipo/mes)
+    renderizarResumenMensual(estados);
+}
+
+// Renderizar Resumen Mensual
+function renderizarResumenMensual(estados) {
+    const tbodyMensual = document.getElementById('lista-resumen-mensual');
+    if (!tbodyMensual) return;
+
+    // Recopilar TODAS las transacciones (sin filtros)
+    const porMes = {};
+    const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+    Object.keys(estados).forEach(key => {
+        if (key.startsWith('FIN_')) {
+            try {
+                const entry = estados[key];
+                if (entry && entry.estado && entry.estado.startsWith('{')) {
+                    const data = JSON.parse(entry.estado);
+                    if (data.deleted) return;
+                    if (!data.fecha) return;
+
+                    // Extraer año-mes (YYYY-MM)
+                    const mesKey = data.fecha.substring(0, 7);
+                    if (!porMes[mesKey]) {
+                        porMes[mesKey] = { ingresos: 0, gastos: 0 };
+                    }
+                    if (data.tipo === 'ingreso') {
+                        porMes[mesKey].ingresos += data.monto || 0;
+                    } else if (data.tipo === 'gasto') {
+                        porMes[mesKey].gastos += data.monto || 0;
+                    }
+                }
+            } catch (e) { }
+        }
+    });
+
+    // Convertir a lista y ordenar descendente
+    const mesesArr = Object.keys(porMes).sort((a, b) => b.localeCompare(a));
+
+    tbodyMensual.innerHTML = '';
+    if (mesesArr.length === 0) {
+        tbodyMensual.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 15px; color: #888;">Sin datos mensuales</td></tr>';
+        return;
+    }
+
+    mesesArr.forEach(mesKey => {
+        const datos = porMes[mesKey];
+        const balance = datos.ingresos - datos.gastos;
+        const esNegativo = balance < 0;
+
+        // Formatear mes para display (2024-11 -> Noviembre 2024)
+        const [year, month] = mesKey.split('-');
+        const mesNombre = mesesNombres[parseInt(month) - 1] || month;
+        const mesDisplay = `${mesNombre} ${year}`;
+
+        const row = document.createElement('tr');
+        row.style.backgroundColor = esNegativo ? 'rgba(231, 76, 60, 0.1)' : '';
+
+        row.innerHTML = `
+            <td style="font-weight: bold;">${mesDisplay}</td>
+            <td style="color: #27ae60;">RD$ ${formatearNumero(datos.ingresos)}</td>
+            <td style="color: #e74c3c;">RD$ ${formatearNumero(datos.gastos)}</td>
+            <td style="font-weight: bold; color: ${esNegativo ? '#e74c3c' : '#27ae60'};">RD$ ${formatearNumero(balance)}</td>
+            <td>
+                ${esNegativo
+                ? '<span style="background: #e74c3c; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em;">⚠️ NEGATIVO</span>'
+                : '<span style="background: #27ae60; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em;">✅ Positivo</span>'
+            }
+            </td>
+        `;
+        tbodyMensual.appendChild(row);
+    });
 }
 
 // Eliminar Transacción
