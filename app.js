@@ -8,6 +8,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwY6RBxV9lu_TUZ
 
 const USUARIOS = {
     'admin': { password: 'admin123', nombre: 'Dra. Cristina García Domínguez', rol: 'Administrador' },
+    'admin17': { password: 'Gardom17', nombre: 'Dra. Cristina García Domínguez', rol: 'Administrador' },
     'secretaria': { password: 'sec123', nombre: 'Secretaria', rol: 'Secretaria' }
 };
 
@@ -36,7 +37,7 @@ document.getElementById('login-form').addEventListener('submit', (e) => {
 
     if (USUARIOS[user] && USUARIOS[user].password === pass) {
         usuarioActual = { username: user, ...USUARIOS[user] };
-        localStorage.setItem('usuario', JSON.stringify(usuarioActual));
+        sessionStorage.setItem('usuario', JSON.stringify(usuarioActual));
         mostrarApp();
     } else {
         errorDiv.textContent = 'Usuario o contraseña incorrectos';
@@ -46,7 +47,7 @@ document.getElementById('login-form').addEventListener('submit', (e) => {
 
 document.getElementById('btn-logout').addEventListener('click', () => {
     usuarioActual = null;
-    localStorage.removeItem('usuario');
+    sessionStorage.removeItem('usuario');
     document.getElementById('app-container').style.display = 'none';
     document.getElementById('login-page').style.display = 'flex';
     document.getElementById('login-user').value = '';
@@ -84,7 +85,7 @@ function aplicarPermisosRol() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const savedUser = localStorage.getItem('usuario');
+    const savedUser = sessionStorage.getItem('usuario');
     if (savedUser) {
         usuarioActual = JSON.parse(savedUser);
         mostrarApp();
@@ -155,7 +156,8 @@ function parsearCSV(csv) {
         telefono: headers.findIndex(h => h.includes('tel')),
         motivo: headers.findIndex(h => h.includes('motivo') && h.includes('principal')),
         especialidad: headers.findIndex(h => h.includes('especialidad')),
-        seguro: headers.findIndex(h => h.includes('seguro') && h.includes('privada'))
+        seguro: headers.findIndex(h => h.includes('seguro') && h.includes('privada')),
+        timestamp: headers.findIndex(h => h.includes('marca') || h.includes('timestamp') || h.includes('tiempo'))
     };
 
     console.log('=== ÍNDICES DE COLUMNAS ===', colIndices);
@@ -165,21 +167,30 @@ function parsearCSV(csv) {
 
         const valores = parsearLinea(lineas[i]);
 
-        // Debug primeras 3 filas
-        if (i <= 3) {
-            console.log(`Fila ${i}:`, {
-                esp: valores[colIndices.especialidad],
-                seg: valores[colIndices.seguro],
-                nom: valores[colIndices.nombre]
-            });
-        }
-
         const nombre = (valores[colIndices.nombre] || '').trim();
         const fecha = (valores[colIndices.fecha] || '').trim();
         const telefono = (valores[colIndices.telefono] || '').trim();
         const motivoPrincipal = (valores[colIndices.motivo] || '').trim();
         const especialidad = (valores[colIndices.especialidad] || '').trim();
         const tipoSeguro = (valores[colIndices.seguro] || '').trim();
+        const timestampStr = (colIndices.timestamp !== -1) ? (valores[colIndices.timestamp] || '') : '';
+
+        // Parsear fecha de creación para ordenamiento
+        let fechaCreacion = new Date(0); // Fallback
+        if (timestampStr) {
+            // Intento básico de parseo dd/mm/yyyy hh:mm:ss
+            try {
+                const parts = timestampStr.split(' ');
+                const dateParts = parts[0].split('/');
+                if (dateParts.length === 3) {
+                    // Asume dd/mm/yyyy. Si falla, el Date será Invalid
+                    const timePart = parts.length > 1 ? parts[1] : '00:00:00';
+                    const isoStr = `${dateParts[2]}-${dateParts[1].padStart(2, '0')}-${dateParts[0].padStart(2, '0')}T${timePart}`;
+                    const d = new Date(isoStr);
+                    if (!isNaN(d.getTime())) fechaCreacion = d;
+                }
+            } catch (e) { console.warn('Error parseando timestamp', timestampStr); }
+        }
 
         if (nombre) {
             const tipoSeguroNormalizado = normalizarSeguroSimple(tipoSeguro);
@@ -195,7 +206,9 @@ function parsearCSV(csv) {
                 especialidad: especialidad || 'No especificado',
                 tipoSeguro: tipoSeguroNormalizado,
                 precio: precio,
-                estado: 'Solicitada'
+                estado: 'Solicitada',
+                creadoEn: fechaCreacion,
+                creadoEnTexto: timestampStr
             });
         }
     }
@@ -434,6 +447,10 @@ async function cargarDashboard(esAutoSync = false) {
     }
 
     todasLasCitas = await cargarDatosDeGoogle();
+
+    // Verificar si hay nuevas citas (para notificaciones)
+    verificarNuevasCitas(todasLasCitas);
+    verificarAlertasBadge();
 
     // Registrar hora de última actualización
     ultimaActualizacion = new Date();
@@ -819,29 +836,36 @@ function mostrarCitas(citas, containerId) {
         'pendiente': { texto: '⏳ Pendiente', clase: 'estado-pendiente' },
         'confirmada': { texto: '✅ Confirmada', clase: 'estado-confirmada' },
         'cancelada': { texto: '❌ Cancelada', clase: 'estado-cancelada' },
-        'reagendada': { texto: '📅 Reagendada', clase: 'estado-reagendada' }
+        'reagendada': { texto: '📅 Reagendada', clase: 'estado-reagendada' },
+        'completada': { texto: '✔️ Completada', clase: 'estado-completada' }
     };
 
     container.innerHTML = citas.map(cita => {
         const citaId = generarCitaId(cita);
         const estado = getCitaEstado(citaId);
         const estadoInfo = estadoLabels[estado] || estadoLabels.pendiente;
+        const notas = getCitaNotas(citaId);
+        const telefonoNorm = normalizarTelefono(cita.telefono);
 
-        // Botones de acción (solo si no está cancelada)
+        // Botones de acción (solo si no está cancelada o completada)
         let botonesHTML = '';
-        if (estado !== 'cancelada' && estado !== 'reagendada') {
+        if (estado !== 'cancelada' && estado !== 'reagendada' && estado !== 'completada') {
             botonesHTML = `
                 <div class="cita-acciones">
                     ${estado !== 'confirmada' ? `<button class="btn-accion btn-confirmar" onclick="confirmarCita('${citaId}')">✅ Confirmar</button>` : ''}
+                    ${estado === 'confirmada' ? `<button class="btn-accion btn-completar" onclick="completarCita('${citaId}')">✔️ Completar</button>` : ''}
                     <button class="btn-accion btn-cancelar" onclick="cancelarCita('${citaId}')">❌ Cancelar</button>
                     <button class="btn-accion btn-reagendar" onclick="reagendarCita('${citaId}')">📅 Reagendar</button>
                 </div>
             `;
         }
 
+        // Mostrar notas si existen
+        const notasHTML = notas ? `<div class="cita-notas">📝 ${notas}</div>` : '';
+
         return `
             <div class="cita-item ${estadoInfo.clase}" data-cita-id="${citaId}">
-                <div class="cita-avatar">${getInitials(cita.paciente)}</div>
+                <div class="cita-avatar" onclick="mostrarHistorialPaciente('${telefonoNorm}')" style="cursor:pointer" title="Ver historial">${getInitials(cita.paciente)}</div>
                 <div class="cita-info">
                     <div class="cita-nombre">${cita.paciente}</div>
                     <div class="cita-detalle">📞 ${cita.telefono}</div>
@@ -849,6 +873,8 @@ function mostrarCitas(citas, containerId) {
                     <div class="cita-detalle">📋 ${cita.motivoPrincipal}</div>
                     <div class="cita-detalle">💳 ${cita.tipoSeguro}</div>
                     <div class="cita-detalle">📅 ${cita.fechaTexto || 'Sin fecha'}</div>
+                    ${notasHTML}
+                    <button class="btn-add-note" onclick="agregarNota('${citaId}')">📝 Agregar nota</button>
                     ${botonesHTML}
                 </div>
                 <span class="cita-estado ${estadoInfo.clase}">${estadoInfo.texto}</span>
@@ -1643,3 +1669,449 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// ========================================
+// Nuevas Funcionalidades
+// ========================================
+
+// ========================================
+// Dark Mode Toggle
+// ========================================
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const isDark = document.body.classList.contains('dark-mode');
+    localStorage.setItem('darkMode', isDark);
+
+    const btn = document.getElementById('btn-dark-mode');
+    if (btn) {
+        btn.textContent = isDark ? '☀️' : '🌙';
+    }
+}
+
+// Restaurar preferencia de tema al cargar
+document.addEventListener('DOMContentLoaded', () => {
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    if (savedDarkMode) {
+        document.body.classList.add('dark-mode');
+        const btn = document.getElementById('btn-dark-mode');
+        if (btn) btn.textContent = '☀️';
+    }
+});
+
+document.getElementById('btn-dark-mode')?.addEventListener('click', toggleDarkMode);
+
+// ========================================
+// Global Search
+// ========================================
+document.getElementById('global-search')?.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase().trim();
+    const dropdown = document.getElementById('global-search-results');
+
+    if (query.length < 2) {
+        dropdown.classList.remove('active');
+        return;
+    }
+
+    const resultados = todosPacientes.filter(p =>
+        p.nombre.toLowerCase().includes(query) ||
+        p.telefono.includes(query)
+    ).slice(0, 8); // Máximo 8 resultados
+
+    if (resultados.length === 0) {
+        dropdown.innerHTML = '<div class="search-result-item"><span class="result-info">No se encontraron resultados</span></div>';
+    } else {
+        dropdown.innerHTML = resultados.map(p => `
+            <div class="search-result-item" onclick="mostrarHistorialPaciente('${normalizarTelefono(p.telefono)}')">
+                <div class="result-avatar">${getInitials(p.nombre)}</div>
+                <div class="result-info">
+                    <div class="result-name">${p.nombre}</div>
+                    <div class="result-phone">📞 ${p.telefono} • ${p.citas} cita${p.citas !== 1 ? 's' : ''}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    dropdown.classList.add('active');
+});
+
+// Cerrar dropdown al hacer clic fuera
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('global-search-results');
+    const search = document.getElementById('global-search');
+    if (dropdown && !dropdown.contains(e.target) && e.target !== search) {
+        dropdown.classList.remove('active');
+    }
+});
+
+// ========================================
+// Print Agenda
+// ========================================
+document.getElementById('btn-print-agenda')?.addEventListener('click', () => {
+    window.print();
+    showToast('Preparando impresión...', 'info');
+});
+
+// ========================================
+// Notas en Citas
+// ========================================
+function getCitaNotas(citaId) {
+    const notas = localStorage.getItem('citasNotas');
+    if (!notas) return '';
+    const notasObj = JSON.parse(notas);
+    return notasObj[citaId] || '';
+}
+
+function setCitaNotas(citaId, nota) {
+    const notas = localStorage.getItem('citasNotas');
+    const notasObj = notas ? JSON.parse(notas) : {};
+    notasObj[citaId] = nota;
+    localStorage.setItem('citasNotas', JSON.stringify(notasObj));
+}
+
+function agregarNota(citaId) {
+    const notaExistente = getCitaNotas(citaId);
+
+    const modal = document.getElementById('note-modal');
+    if (modal) {
+        document.getElementById('note-cita-id').value = citaId;
+        document.getElementById('note-input').value = notaExistente;
+        modal.style.display = 'flex';
+        setTimeout(() => {
+            const input = document.getElementById('note-input');
+            if (input) input.focus();
+        }, 100);
+    } else {
+        alert('Error: Modal de notas no encontrado. Por favor recargue la página.');
+    }
+}
+
+function cerrarModalNota() {
+    const modal = document.getElementById('note-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function guardarNotaModal() {
+    const citaId = document.getElementById('note-cita-id').value;
+    const nuevaNota = document.getElementById('note-input').value;
+
+    setCitaNotas(citaId, nuevaNota);
+    showToast('Nota guardada correctamente', 'success');
+    cerrarModalNota();
+
+    // Recargar vista
+    if (document.getElementById('view-citas').classList.contains('active')) {
+        cargarAgenda();
+    } else {
+        cargarDashboard();
+    }
+}
+
+// ========================================
+// Historial de Paciente
+// ========================================
+function mostrarHistorialPaciente(telefonoNorm) {
+    // Buscar todas las citas de este paciente
+    const citasPaciente = todasLasCitas.filter(c =>
+        normalizarTelefono(c.telefono) === telefonoNorm
+    );
+
+    if (citasPaciente.length === 0) {
+        showToast('No se encontró historial para este paciente', 'warning');
+        return;
+    }
+
+    // Obtener nombre del paciente (el más largo)
+    const nombrePaciente = citasPaciente.reduce((longest, c) =>
+        c.paciente.length > longest.length ? c.paciente : longest
+        , '');
+
+    // Ordenar por fecha (más reciente primero)
+    citasPaciente.sort((a, b) => {
+        if (!a.fecha || !b.fecha) return 0;
+        return b.fecha.localeCompare(a.fecha);
+    });
+
+    // Crear modal
+    let modal = document.getElementById('modal-historial');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-historial';
+        modal.className = 'modal-overlay';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="modal-content history-modal-content">
+            <div class="modal-header">
+                <h3>📋 Historial de ${nombrePaciente}</h3>
+                <button class="modal-close" onclick="cerrarModalHistorial()">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 16px; color: var(--text-gray);">
+                    📞 ${citasPaciente[0].telefono} • ${citasPaciente.length} cita${citasPaciente.length !== 1 ? 's' : ''} registrada${citasPaciente.length !== 1 ? 's' : ''}
+                </p>
+                <div class="history-list">
+                    ${citasPaciente.map(c => {
+        const citaId = generarCitaId(c);
+        const estado = getCitaEstado(citaId);
+        const notas = getCitaNotas(citaId);
+        return `
+                            <div class="history-item">
+                                <div class="history-date">📅 ${c.fechaTexto || 'Sin fecha'}</div>
+                                <div class="history-details">
+                                    🩺 ${c.especialidad} • 📋 ${c.motivoPrincipal} • 💳 ${c.tipoSeguro}
+                                    <br>Estado: <strong>${estado}</strong>
+                                    ${notas ? `<br>📝 <em>${notas}</em>` : ''}
+                                </div>
+                            </div>
+                        `;
+    }).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
+
+    // Cerrar al hacer clic fuera
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) cerrarModalHistorial();
+    });
+}
+
+function cerrarModalHistorial() {
+    const modal = document.getElementById('modal-historial');
+    if (modal) modal.style.display = 'none';
+}
+
+// ========================================
+// Completar Cita
+// ========================================
+function completarCita(citaId) {
+    setCitaEstado(citaId, 'completada');
+    showToast('Cita marcada como completada', 'success');
+    if (document.getElementById('view-citas').classList.contains('active')) {
+        cargarAgenda();
+    } else {
+        cargarDashboard();
+    }
+}
+
+// ========================================
+// Push Notifications System
+// ========================================
+let citasCountAnterior = 0;
+let notificacionesActivas = true;
+
+// Solicitar permisos de notificación al cargar
+function solicitarPermisosNotificacion() {
+    if ('Notification' in window) {
+        if (Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    showToast('Notificaciones activadas', 'success');
+                }
+            });
+        }
+    }
+}
+
+// Mostrar notificación de nuevas citas
+function mostrarNotificacionNuevasCitas(cantidad) {
+    // Notificación del navegador
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification('🩺 Sistema Médico', {
+            body: `${cantidad} nueva${cantidad > 1 ? 's' : ''} cita${cantidad > 1 ? 's' : ''} registrada${cantidad > 1 ? 's' : ''}`,
+            icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🏥</text></svg>',
+            tag: 'nuevas-citas',
+            requireInteraction: false
+        });
+
+        notification.onclick = () => {
+            window.focus();
+            notification.close();
+        };
+
+        setTimeout(() => notification.close(), 5000);
+    }
+
+    // Banner visual en la app
+    mostrarBannerNotificacion(`🔔 ${cantidad} nueva${cantidad > 1 ? 's' : ''} cita${cantidad > 1 ? 's' : ''} registrada${cantidad > 1 ? 's' : ''}`);
+}
+
+// Banner de notificación visual
+function mostrarBannerNotificacion(mensaje) {
+    // Remover banner existente si hay
+    const bannerExistente = document.querySelector('.notification-banner');
+    if (bannerExistente) bannerExistente.remove();
+
+    const banner = document.createElement('div');
+    banner.className = 'notification-banner';
+    banner.innerHTML = `
+        <div class="notification-text">
+            <span>${mensaje}</span>
+        </div>
+        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+    `;
+
+    document.body.appendChild(banner);
+
+    // Auto-cerrar después de 8 segundos
+    setTimeout(() => {
+        if (banner.parentElement) {
+            banner.style.animation = 'slideDown 0.3s ease-out reverse';
+            setTimeout(() => banner.remove(), 300);
+        }
+    }, 8000);
+}
+
+// Verificar nuevas citas durante sincronización
+function verificarNuevasCitas(citasActuales) {
+    const cantidadActual = citasActuales.length;
+
+    if (citasCountAnterior > 0 && cantidadActual > citasCountAnterior) {
+        const nuevas = cantidadActual - citasCountAnterior;
+        if (notificacionesActivas) {
+            mostrarNotificacionNuevasCitas(nuevas);
+        }
+    }
+
+    citasCountAnterior = cantidadActual;
+}
+
+// Solicitar permisos cuando se muestra la app
+document.addEventListener('DOMContentLoaded', () => {
+    // Retrasar para no molestar inmediatamente
+    setTimeout(() => {
+        if (sessionStorage.getItem('usuario')) {
+            solicitarPermisosNotificacion();
+        }
+    }, 3000);
+});
+
+// ========================================
+// Initialize Lucide Icons
+// ========================================
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize Lucide icons if available
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+});
+
+// ========================================
+// Seguridad y Exposición Global
+// ========================================
+
+// 1. Limpieza de credenciales antiguas (seguridad)
+try {
+    if (localStorage.getItem('usuario')) {
+        localStorage.removeItem('usuario');
+        console.log('Credenciales antiguas eliminadas por seguridad');
+    }
+} catch (e) { console.error(e); }
+
+// 2. Exponer funciones al objeto Window
+window.toggleDarkMode = toggleDarkMode;
+window.agregarNota = agregarNota;
+window.mostrarHistorialPaciente = mostrarHistorialPaciente;
+window.completarCita = completarCita;
+window.confirmarCita = confirmarCita;
+window.cancelarCita = cancelarCita;
+window.reagendarCita = reagendarCita;
+window.cerrarModalNota = cerrarModalNota;
+window.guardarNotaModal = guardarNotaModal;
+
+// ========================================
+// Centro de Notificaciones (Citas Recientes)
+// ========================================
+
+const btnNotif = document.getElementById('btn-notifications');
+const modalNotif = document.getElementById('notifications-modal');
+const badgeNotif = document.getElementById('badge-notifications');
+
+if (btnNotif) {
+    btnNotif.addEventListener('click', () => {
+        mostrarNotificaciones();
+        localStorage.setItem('lastNotificationCheck', new Date().toISOString());
+        if (badgeNotif) badgeNotif.style.display = 'none';
+    });
+}
+
+function cerrarModalNotificaciones() {
+    if (modalNotif) modalNotif.style.display = 'none';
+}
+
+window.cerrarModalNotificaciones = cerrarModalNotificaciones;
+
+function mostrarNotificaciones() {
+    // Copia para no alterar el orden original
+    let citasOrdenadas = [...todasLasCitas];
+
+    // Preferir ordenamiento por Timestamp de creación si existe
+    const tieneTimestamps = citasOrdenadas.some(c => c.creadoEn && c.creadoEn.getTime() > 0);
+
+    if (tieneTimestamps) {
+        citasOrdenadas.sort((a, b) => b.creadoEn - a.creadoEn);
+    } else {
+        // Fallback: Asumir que las últimas del CSV son las más nuevas
+        citasOrdenadas.reverse();
+    }
+
+    const topCitas = citasOrdenadas.slice(0, 20); // Mostrar últimas 20
+    const container = document.getElementById('lista-notificaciones');
+
+    if (topCitas.length === 0) {
+        container.innerHTML = '<p class="empty-state">No hay citas registradas</p>';
+        if (modalNotif) modalNotif.style.display = 'flex';
+        return;
+    }
+
+    const lastCheckStr = localStorage.getItem('lastNotificationCheck');
+    // Si es la primera vez (null), asumir que todo es "visto" o solo mostrar lista sin resaltar excesivamente
+    // O mejor: usar Date(0) para resaltar todo como nuevo si nunca ha entrado.
+    const lastCheck = lastCheckStr ? new Date(lastCheckStr) : new Date(0);
+
+    container.innerHTML = topCitas.map(cita => {
+        // Es nueva si su fecha de creación es posterior a la última revisión
+        // Si no tiene fecha de creación (csv viejo), no podemos saber, asumimos falso para no molestar
+        const esNueva = cita.creadoEn && cita.creadoEn > lastCheck;
+
+        const highlightStyle = esNueva ? 'background-color: rgba(72, 201, 176, 0.1); border-left: 3px solid var(--teal);' : 'border-left: 3px solid transparent;';
+
+        return `
+            <div class="notification-item" style="padding: 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border); border-radius: 4px; ${highlightStyle}">
+                <div style="display:flex; justify-content:space-between; align-items: flex-start; margin-bottom: 4px;">
+                    <strong style="color: var(--text-dark);">${cita.paciente}</strong>
+                    ${esNueva ? '<span style="font-size:0.7em; background:var(--teal); color:white; padding:2px 6px; border-radius:10px; font-weight:bold;">NUEVA</span>' : ''}
+                </div>
+                <div style="font-size:0.9em; color:var(--text-gray); margin-bottom: 2px;">
+                    📅 <strong>Fecha Cita:</strong> ${cita.fechaTexto}
+                </div>
+                 <div style="font-size:0.9em; color:var(--text-gray); margin-bottom: 2px;">
+                    🩺 ${cita.especialidad}
+                </div>
+                <div style="font-size:0.85em; color: var(--text-light);">
+                    📝 ${cita.motivoPrincipal}
+                </div>
+                <div style="font-size:0.75em; color:var(--text-light); text-align: right; margin-top: 5px;">
+                     Ingresado: ${cita.creadoEnTexto || 'Fecha desconocida'}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    if (modalNotif) modalNotif.style.display = 'flex';
+}
+
+function verificarAlertasBadge() {
+    const lastCheckStr = localStorage.getItem('lastNotificationCheck');
+    const lastCheck = lastCheckStr ? new Date(lastCheckStr) : new Date(0);
+
+    const hayNuevas = todasLasCitas.some(c => c.creadoEn && c.creadoEn > lastCheck);
+
+    if (badgeNotif) {
+        badgeNotif.style.display = hayNuevas ? 'block' : 'none';
+    }
+}
+

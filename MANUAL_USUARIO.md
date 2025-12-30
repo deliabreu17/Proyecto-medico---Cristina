@@ -99,15 +99,39 @@ Barras apiladas mostrando ingresos por mes y tipo de consulta.
 
 ---
 
-## 🔔 6. Notificaciones (Toasts)
+## 🔔 6. Centro de Notificaciones
+1. Haga clic en el icono de **Campana 🔔** en el menú lateral.
+2. Si aparece un **punto rojo**, indica que hay nuevas citas registradas recientemente.
+3. Se abrirá una lista con las **últimas 20 citas agendadas**, ordenadas por fecha de creación ("llegada"), para que no pierda ninguna cita nueva aunque sea para una fecha futura.
+4. Las citas nuevas aparecerán resaltadas en color verde.
 
-El sistema muestra notificaciones elegantes en la esquina superior derecha:
-- ✅ **Verde**: Éxito
-- ❌ **Rojo**: Error
-- ⚠️ **Amarillo**: Advertencia
-- ℹ️ **Azul**: Información
+### Notificaciones de Toast
+El sistema también muestra alertas breves en la esquina superior derecha para confirmar acciones (Guardado, Error, etc).
 
-Las notificaciones desaparecen automáticamente después de 4 segundos.
+---
+
+## 🚀 7. Funciones Avanzadas
+
+### 🌙 Modo Oscuro
+- Haga clic en el botón de **Luna/Sol** en el menú lateral para alternar entre modo claro y oscuro.
+- Su preferencia se guardará automáticamente.
+
+### 🔍 Búsqueda Global
+- En la parte superior del Dashboard, use la barra de búsqueda "Buscar paciente...".
+- Escriba nombre o teléfono para encontrar rápidamente cualquier paciente.
+- Haga clic en un resultado para ver su historial.
+
+### 📝 Notas en Citas
+1. En la tarjeta de cada cita, haga clic en el botón **"Agregar nota"**.
+2. Escriba sus observaciones en la ventana emergente.
+3. Guarde para que la nota quede visible permanentemente en la cita.
+
+### 📁 Historial del Paciente
+- Haga clic en el **Avatar** (círculo con iniciales) de cualquier cita.
+- Se abrirá una ventana con todas las citas pasadas y futuras de ese paciente específica.
+
+### 🖨️ Imprimir Agenda
+- En la vista de Agenda, use el botón **"Imprimir Agenda"** para generar una versión en papel o PDF de las citas del día.
 
 ---
 

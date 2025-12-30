@@ -9,6 +9,8 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700&display=swap"
         rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 
 <body>
@@ -145,7 +147,16 @@
                         <p class="user-role" id="user-role">Rol</p>
                     </div>
                 </div>
-                <button id="btn-logout" class="btn-logout">Salir</button>
+                <div class="sidebar-actions">
+                    <button id="btn-notifications" class="btn-theme" style="position: relative;"
+                        title="Citas recientes">
+                        🔔
+                        <span id="badge-notifications"
+                            style="position: absolute; top: 0; right: 0; width: 10px; height: 10px; background: #e74c3c; border-radius: 50%; border: 2px solid white; display: none;"></span>
+                    </button>
+                    <button id="btn-dark-mode" class="btn-theme" title="Cambiar tema">🌙</button>
+                    <button id="btn-logout" class="btn-logout">Salir</button>
+                </div>
             </div>
         </aside>
 
@@ -166,6 +177,13 @@
                         <button id="btn-refresh" class="btn-secondary">🔄 Actualizar</button>
                     </div>
                 </header>
+
+                <!-- Búsqueda Global -->
+                <div class="global-search-container">
+                    <input type="text" id="global-search" class="global-search"
+                        placeholder="🔍 Buscar paciente por nombre o teléfono...">
+                    <div id="global-search-results" class="search-results-dropdown"></div>
+                </div>
 
                 <div class="stats-grid">
                     <div class="stat-card stat-teal">
@@ -223,6 +241,7 @@
                         <h2 class="page-title">📅 Agenda de Citas</h2>
                         <p class="page-subtitle">Gestiona las citas del consultorio</p>
                     </div>
+                    <button id="btn-print-agenda" class="btn-secondary">🖨️ Imprimir</button>
                 </header>
 
                 <div class="date-nav">
@@ -412,6 +431,45 @@
             <div class="modal-footer">
                 <button id="dp-today" class="btn-secondary">Hoy</button>
                 <button id="dp-cancel" class="btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Note Modal -->
+    <div id="note-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 500px">
+            <div class="modal-header">
+                <h3>📝 Notas de la Cita</h3>
+                <button class="modal-close" onclick="cerrarModalNota()">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 8px; color: var(--text-gray)">Agrega observaciones o detalles importantes:</p>
+                <textarea id="note-input" class="form-input" rows="4" placeholder="Escribe aquí..."></textarea>
+                <input type="hidden" id="note-cita-id">
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="cerrarModalNota()">Cancelar</button>
+                <button class="btn-primary" onclick="guardarNotaModal()">Guardar Nota</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Notifications Modal -->
+    <div id="notifications-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 600px">
+            <div class="modal-header">
+                <h3>🔔 Últimas Citas Recibidas</h3>
+                <button class="modal-close" onclick="cerrarModalNotificaciones()">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 15px; color: var(--text-gray); font-size: 0.9em;">
+                    Listado cronológico de las últimas 20 citas agendadas ordenadas por fecha de creación:
+                </p>
+                <div id="lista-notificaciones" class="modal-list notifications-list"
+                    style="max-height: 400px; overflow-y: auto;">
+                    <!-- Items JS -->
+                </div>
             </div>
         </div>
     </div>

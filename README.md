@@ -2,11 +2,18 @@
 
 Sistema de gestión de consultorio médico para la **Dra. Cristina García Domínguez**, Pediatra Cardiólogo.
 
-![Vista del Sistema](https://img.shields.io/badge/Estado-Activo-brightgreen) ![Versión](https://img.shields.io/badge/Versión-1.0-blue)
+![Vista del Sistema](https://img.shields.io/badge/Estado-Activo-brightgreen) ![Versión](https://img.shields.io/badge/Versión-1.2-blue)
 
 ## 📋 Descripción
 
 Sistema web completo para la gestión de citas médicas, pacientes y estadísticas del consultorio. Integrado con Google Sheets para la captura de datos de citas a través de formularios.
+
+## ✨ Novedades v1.2 (Diciembre 2025)
+- **Centro de Notificaciones Inteligente**: Visualiza citas recién creadas al instante.
+- **Modo Oscuro**: Interfaz adaptable para reducir fatiga visual.
+- **Búsqueda Global**: Encuentra pacientes y sus historiales rápidamente.
+- **Gestión Avanzada**: Notas en citas, impresión de agenda y estados de atención.
+- **Seguridad**: Manejo de sesiones mejorado.
 
 ## ✨ Características Principales
 

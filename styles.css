@@ -1399,6 +1399,34 @@ body {
     text-transform: uppercase;
 }
 
+/* ========================================
+   Form Inputs Styling
+   ======================================== */
+.form-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    resize: vertical;
+    transition: all 0.2s;
+    background: var(--bg-white);
+    color: var(--text-dark);
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px rgba(72, 201, 176, 0.1);
+}
+
+body.dark-mode .form-input {
+    background: #1a1a2e;
+    border-color: var(--border);
+    color: var(--text-dark);
+}
+
 .legend-item {
     display: flex;
     align-items: center;
@@ -1977,4 +2005,700 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+/* ========================================
+   Dark Mode Theme
+   ======================================== */
+body.dark-mode {
+    --bg-light: #1a1a2e;
+    --bg-white: #16213e;
+    --text-dark: #eaeaea;
+    --text-gray: #a0a0a0;
+    --border: #2d3748;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+body.dark-mode .main-content {
+    background: var(--bg-light);
+}
+
+body.dark-mode .stat-card,
+body.dark-mode .section-card,
+body.dark-mode .chart-card,
+body.dark-mode .date-nav,
+body.dark-mode .paciente-card,
+body.dark-mode .cita-item {
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+}
+
+body.dark-mode .page-title,
+body.dark-mode .stat-value,
+body.dark-mode .cita-nombre,
+body.dark-mode h3 {
+    color: var(--text-dark);
+}
+
+body.dark-mode .stat-label,
+body.dark-mode .page-subtitle,
+body.dark-mode .cita-detalle {
+    color: var(--text-gray);
+}
+
+body.dark-mode .search-box input,
+body.dark-mode .global-search,
+body.dark-mode .modal-search {
+    background: #1a1a2e;
+    color: var(--text-dark);
+    border-color: var(--border);
+}
+
+body.dark-mode .btn-secondary {
+    background: var(--bg-white);
+    border-color: var(--border);
+    color: var(--text-gray);
+}
+
+body.dark-mode .cita-item:hover {
+    background: #1f2937;
+}
+
+body.dark-mode .modal-content {
+    background: var(--bg-white);
+    color: var(--text-dark);
+}
+
+/* ========================================
+   Theme Toggle Button
+   ======================================== */
+.sidebar-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-theme {
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 10px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-theme:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.btn-logout {
+    flex: 1;
+}
+
+/* ========================================
+   Global Search
+   ======================================== */
+.global-search-container {
+    position: relative;
+    margin-bottom: 24px;
+}
+
+.global-search {
+    width: 100%;
+    padding: 14px 20px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    font-size: 15px;
+    transition: all 0.3s;
+    background: var(--bg-white);
+}
+
+.global-search:focus {
+    outline: none;
+    border-color: var(--teal);
+    box-shadow: 0 0 0 4px rgba(72, 201, 176, 0.15);
+}
+
+.search-results-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+}
+
+.search-results-dropdown.active {
+    display: block;
+}
+
+.search-result-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-item:hover {
+    background: rgba(72, 201, 176, 0.1);
+}
+
+.search-result-item .result-avatar {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--teal), var(--coral));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.search-result-item .result-info {
+    flex: 1;
+}
+
+.search-result-item .result-name {
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.search-result-item .result-phone {
+    font-size: 13px;
+    color: var(--text-gray);
+}
+
+/* ========================================
+   Glassmorphism Cards
+   ======================================== */
+.stat-card {
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+}
+
+/* ========================================
+   Enhanced State Colors for Appointments
+   ======================================== */
+.cita-item.estado-pendiente {
+    border-left: 4px solid #f59e0b;
+}
+
+.cita-item.estado-confirmada {
+    border-left: 4px solid var(--green);
+    background: linear-gradient(90deg, rgba(88, 214, 141, 0.05), transparent);
+}
+
+.cita-item.estado-cancelada {
+    border-left: 4px solid #ef4444;
+    opacity: 0.7;
+}
+
+.cita-item.estado-reagendada {
+    border-left: 4px solid var(--blue);
+}
+
+.cita-item.estado-completada {
+    border-left: 4px solid #8b5cf6;
+    background: linear-gradient(90deg, rgba(139, 92, 246, 0.05), transparent);
+}
+
+.estado-completada {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+/* ========================================
+   Enhanced Animations
+   ======================================== */
+.stat-card,
+.section-card,
+.chart-card,
+.cita-item,
+.paciente-card {
+    animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.nav-item {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-item:hover {
+    transform: translateX(5px);
+}
+
+.btn-accion {
+    transition: all 0.2s ease;
+}
+
+.btn-accion:hover {
+    transform: scale(1.05);
+}
+
+/* Button for completing appointment */
+.btn-completar {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+.btn-completar:hover {
+    background: #ddd6fe;
+}
+
+/* ========================================
+   Print Styles
+   ======================================== */
+@media print {
+
+    .sidebar,
+    .sync-controls,
+    .btn-secondary,
+    .btn-accion,
+    .cita-acciones,
+    .nav-menu,
+    .sidebar-user,
+    .global-search-container {
+        display: none !important;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+        padding: 20px !important;
+    }
+
+    .cita-item {
+        break-inside: avoid;
+        border: 1px solid #ddd !important;
+        margin-bottom: 10px !important;
+    }
+
+    .page-title {
+        font-size: 24px !important;
+    }
+
+    body {
+        background: white !important;
+    }
+
+    .stat-card,
+    .section-card {
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+    }
+}
+
+/* ========================================
+   Patient History Modal
+   ======================================== */
+.history-modal-content {
+    max-width: 700px;
+}
+
+.history-item {
+    padding: 12px 16px;
+    border-left: 3px solid var(--teal);
+    margin-bottom: 10px;
+    background: var(--bg-light);
+    border-radius: 0 8px 8px 0;
+}
+
+.history-item .history-date {
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+}
+
+.history-item .history-details {
+    font-size: 13px;
+    color: var(--text-gray);
+}
+
+/* Notes in appointments */
+.cita-notas {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(72, 201, 176, 0.1);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text-dark);
+    font-style: italic;
+}
+
+.btn-add-note {
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 12px;
+    padding: 4px 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all 0.2s;
+}
+
+.btn-add-note:hover {
+    background: #fde68a;
+}
+
+/* ========================================
+   Notification Banner
+   ======================================== */
+.notification-banner {
+    position: fixed;
+    top: 0;
+    left: 280px;
+    right: 0;
+    background: linear-gradient(90deg, var(--green), var(--teal));
+    color: white;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 1000;
+    animation: slideDown 0.3s ease-out;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+.notification-banner .notification-text {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+}
+
+.notification-banner .notification-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.2s;
+}
+
+.notification-banner .notification-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* ========================================
+   Lucide Icons Styling
+   ======================================== */
+.lucide-icon {
+    width: 20px;
+    height: 20px;
+    stroke-width: 2;
+}
+
+.nav-icon .lucide-icon {
+    width: 18px;
+    height: 18px;
+}
+
+/* ========================================
+   Responsive Design - Tablets (1024px)
+   ======================================== */
+@media (max-width: 1024px) {
+    .sidebar {
+        width: 240px;
+    }
+
+    .main-content {
+        margin-left: 240px;
+        padding: 24px;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .notification-banner {
+        left: 240px;
+    }
+}
+
+/* ========================================
+   Responsive Design - Mobile (768px)
+   ======================================== */
+@media (max-width: 768px) {
+    .app-container {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        padding: 16px;
+    }
+
+    .sidebar .logo {
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+    }
+
+    .nav-menu {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .nav-item {
+        padding: 10px 14px;
+        flex: 1;
+        min-width: 100px;
+        justify-content: center;
+        text-align: center;
+        margin-bottom: 0;
+    }
+
+    .nav-item .nav-icon {
+        margin-right: 0;
+    }
+
+    .sidebar-user {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 16px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .sidebar-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 16px;
+        min-height: auto;
+    }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .sync-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .stat-card {
+        padding: 16px;
+    }
+
+    .stat-value {
+        font-size: 24px;
+    }
+
+    .stat-icon {
+        font-size: 28px;
+    }
+
+    .date-nav {
+        flex-direction: column;
+        gap: 12px;
+        padding: 16px;
+    }
+
+    .date-nav button {
+        width: 100%;
+    }
+
+    .cita-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .cita-avatar {
+        align-self: flex-start;
+    }
+
+    .cita-estado {
+        align-self: flex-end;
+        margin-top: -40px;
+    }
+
+    .cita-acciones {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .btn-accion {
+        flex: 1;
+        min-width: 80px;
+        text-align: center;
+        justify-content: center;
+    }
+
+    .pacientes-lista {
+        grid-template-columns: 1fr;
+    }
+
+    .notification-banner {
+        left: 0;
+    }
+
+    .global-search-container {
+        margin-bottom: 16px;
+    }
+
+    .modal-content {
+        margin: 16px;
+        max-height: 90vh;
+    }
+
+    .login-card-split {
+        max-width: 100%;
+        margin: 10px;
+    }
+}
+
+/* ========================================
+   Responsive Design - Small Mobile (480px)
+   ======================================== */
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .page-title {
+        font-size: 22px;
+    }
+
+    .stat-value {
+        font-size: 22px;
+    }
+
+    .cita-estado {
+        margin-top: 0;
+        align-self: flex-start;
+    }
+
+    .btn-accion {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+
+    .sidebar .nav-item {
+        flex: 0 0 45%;
+    }
+
+    .user-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .chart-card {
+        padding: 16px;
+    }
+
+    .login-brand-side {
+        padding: 30px 20px;
+    }
+
+    .login-logo-large {
+        width: 80px;
+        height: 80px;
+    }
+
+    .brand-content h1 {
+        font-size: 22px;
+    }
+
+    .login-form-side {
+        padding: 30px 20px;
+    }
+
+    .form-header h2 {
+        font-size: 26px;
+    }
+}
+
+/* ========================================
+   Mobile Menu Toggle (for future enhancement)
+   ======================================== */
+.mobile-menu-toggle {
+    display: none;
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1001;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 768px) {
+    .mobile-menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 }

@@ -74,11 +74,21 @@
 ---
 
 ## 🚀 Próximas Mejoras (Backlog)
-- [ ] Exportar estadísticas a PDF
-- [ ] Notificaciones push para citas
 - [ ] Integración con WhatsApp
-- [ ] Modo oscuro
-- [ ] Backup automático de datos
+- [ ] Backup automático de datos offline
+
+---
+
+## ✅ Fase 8: Súper Funcionalidades (Dic 30 2025)
+- [x] **Modo Oscuro**: Tema dark/light persistente
+- [x] **Centro de Notificaciones**: Detección de nuevas citas con badge alerta
+- [x] **Búsqueda Global**: Buscador omnibox para pacientes por nombre/teléfono
+- [x] **Historial Clínico**: Vista rápida de historial de citas por paciente
+- [x] **Notas en Citas**: Modal para agregar observaciones a cada cita
+- [x] **Gestión de Estados**: Nuevo estado "Completada" y flujo de trabajo
+- [x] **Impresión**: Exportar agenda del día a PDF/Impresora
+- [x] **Seguridad Mejorada**: Sesiones temporales y limpieza de credenciales
+- [x] **Iconografía Moderna**: Implementación de Lucide Icons
 
 ---
 
