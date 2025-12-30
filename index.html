@@ -251,6 +251,17 @@
                         <p id="citas-count"></p>
                         <input type="date" id="fecha-picker" title="Seleccionar fecha">
                     </div>
+
+                    <select id="agenda-estado-filter" class="form-input"
+                        style="width: auto; margin: 0 10px; padding: 8px; cursor: pointer;">
+                        <option value="dia">📅 Citas del Día</option>
+                        <option value="todas">📋 Historial Completo</option>
+                        <option value="confirmada">✅ Solo Confirmadas</option>
+                        <option value="cancelada">❌ Solo Canceladas</option>
+                        <option value="reagendada">🔄 Solo Reagendadas</option>
+                        <option value="completada">🏁 Solo Completadas</option>
+                    </select>
+
                     <button id="btn-next-day" class="btn-secondary">Siguiente →</button>
                 </div>
 
