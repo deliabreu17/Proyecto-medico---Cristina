@@ -158,7 +158,13 @@
                         <h2 class="page-title">¡Buen día! 👋</h2>
                         <p class="page-subtitle" id="fecha-hoy"></p>
                     </div>
-                    <button id="btn-refresh" class="btn-secondary">🔄 Actualizar</button>
+                    <div class="sync-controls">
+                        <span class="sync-status" id="sync-status">
+                            <span class="sync-indicator"></span>
+                            <span id="ultima-sync">Sincronizando...</span>
+                        </span>
+                        <button id="btn-refresh" class="btn-secondary">🔄 Actualizar</button>
+                    </div>
                 </header>
 
                 <div class="stats-grid">

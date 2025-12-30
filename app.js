@@ -20,7 +20,8 @@ let todosPacientes = [];
 let filtrosActivos = {
     especialidad: null,
     tipoSeguro: null,
-    mes: null
+    mes: null,
+    motivo: null
 };
 
 // ========================================
@@ -66,6 +67,9 @@ function mostrarApp() {
     sincronizarEstados();
 
     cargarDashboard();
+
+    // Iniciar auto-sincronización
+    iniciarAutoSync();
 }
 
 // Control de permisos por rol
@@ -242,6 +246,39 @@ function normalizarSeguroSimple(valor) {
     return valor;
 }
 
+// Normalizar teléfono: eliminar todo excepto dígitos
+function normalizarTelefono(telefono) {
+    if (!telefono) return '';
+    // Eliminar todo excepto dígitos (parentesis, guiones, espacios, etc.)
+    return telefono.replace(/\D/g, '');
+}
+
+// Deduplicar citas: mismo teléfono + misma fecha = mismo paciente
+// Mantiene la cita con el nombre más largo/completo
+function deduplicarCitas(citas) {
+    const citasUnicas = {};
+
+    citas.forEach(cita => {
+        const telefonoNorm = normalizarTelefono(cita.telefono);
+        // Clave única: teléfono + fecha
+        const clave = `${telefonoNorm}_${cita.fecha}`;
+
+        if (!citasUnicas[clave]) {
+            // Primera vez que vemos esta combinación
+            citasUnicas[clave] = cita;
+        } else {
+            // Ya existe una cita para este teléfono+fecha
+            // Mantener la que tiene el nombre más largo (más completo)
+            if (cita.paciente.length > citasUnicas[clave].paciente.length) {
+                citasUnicas[clave] = cita;
+            }
+        }
+    });
+
+    console.log(`📋 Deduplicación: ${citas.length} citas → ${Object.keys(citasUnicas).length} únicas`);
+    return Object.values(citasUnicas);
+}
+
 function parsearLinea(linea) {
     const valores = [];
     let actual = '';
@@ -291,7 +328,9 @@ function parsearFecha(fechaStr) {
         'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
     };
 
-    const str = fechaStr.toLowerCase();
+    const str = fechaStr.toLowerCase().trim();
+
+    // Buscar patrón: día + de + mes (ej: "23 de diciembre", "Martes 23 de Diciembre", "Jueves 08 de Enero de 2025")
     const matches = str.match(/(\d+)\s+de\s+(\w+)/);
 
     if (matches) {
@@ -299,10 +338,42 @@ function parsearFecha(fechaStr) {
         const mesNombre = matches[2];
         const mes = meses[mesNombre];
         if (mes) {
-            const año = new Date().getFullYear();
-            return `${año}-${mes}-${dia}`;
+            let año;
+
+            // Primero intentar extraer el año del texto (nuevo formato: "de 2025")
+            const matchAño = str.match(/de\s+(\d{4})/);
+            if (matchAño) {
+                año = parseInt(matchAño[1], 10);
+            } else {
+                // Si no tiene año, calcularlo automáticamente
+                const hoy = new Date();
+                año = hoy.getFullYear();
+
+                // Lógica mejorada para detectar si la cita es del próximo año:
+                // Si estamos en los últimos meses del año (oct-dic) y la cita es para
+                // los primeros meses (ene-mar), asumimos que es para el próximo año
+                const mesActual = hoy.getMonth() + 1; // 1-12
+                const mesNum = parseInt(mes, 10);
+
+                if (mesNum <= 3 && mesActual >= 10) {
+                    año = año + 1;
+                }
+            }
+
+            const fechaResultado = `${año}-${mes}-${dia}`;
+            console.log(`📅 Parseando fecha: "${fechaStr}" → ${fechaResultado}`);
+            return fechaResultado;
         }
     }
+
+    // Intentar formato de fecha estándar dd/mm/yyyy o mm/dd/yyyy
+    const matchFecha = str.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (matchFecha) {
+        const [, d, m, y] = matchFecha;
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+
+    console.log(`⚠️ No se pudo parsear la fecha: "${fechaStr}"`);
     return null;
 }
 
@@ -310,26 +381,90 @@ function parsearFecha(fechaStr) {
 // Dashboard
 // ========================================
 
-async function cargarDashboard() {
+// Auto-sync configuration
+const AUTO_SYNC_INTERVAL = 60000; // 60 segundos
+let autoSyncTimer = null;
+let ultimaActualizacion = null;
+
+// Actualizar indicador de última sincronización
+function actualizarIndicadorSync(sincronizando = false) {
+    const indicator = document.querySelector('.sync-indicator');
+    const syncText = document.getElementById('ultima-sync');
+
+    if (!indicator || !syncText) return;
+
+    if (sincronizando) {
+        indicator.classList.add('syncing');
+        syncText.textContent = 'Sincronizando...';
+    } else {
+        indicator.classList.remove('syncing');
+        if (ultimaActualizacion) {
+            const ahora = new Date();
+            const diff = Math.floor((ahora - ultimaActualizacion) / 1000);
+
+            if (diff < 60) {
+                syncText.textContent = 'Actualizado hace ' + diff + 's';
+            } else if (diff < 3600) {
+                syncText.textContent = 'Actualizado hace ' + Math.floor(diff / 60) + 'm';
+            } else {
+                syncText.textContent = ultimaActualizacion.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+            }
+        }
+    }
+}
+
+// Actualizar el texto del indicador cada 10 segundos
+setInterval(() => {
+    if (ultimaActualizacion && !document.querySelector('.sync-indicator')?.classList.contains('syncing')) {
+        actualizarIndicadorSync(false);
+    }
+}, 10000);
+
+async function cargarDashboard(esAutoSync = false) {
     const hoy = new Date();
     document.getElementById('fecha-hoy').textContent = hoy.toLocaleDateString('es-DO', {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
     });
 
-    document.getElementById('citas-hoy-lista').innerHTML = '<p class="empty-state">Cargando citas...</p>';
+    // Mostrar indicador de sincronización
+    actualizarIndicadorSync(true);
+
+    if (!esAutoSync) {
+        document.getElementById('citas-hoy-lista').innerHTML = '<p class="empty-state">Cargando citas...</p>';
+    }
 
     todasLasCitas = await cargarDatosDeGoogle();
 
-    const hoyStr = hoy.toISOString().split('T')[0];
-    const citasHoy = todasLasCitas.filter(c => c.fecha === hoyStr);
+    // Registrar hora de última actualización
+    ultimaActualizacion = new Date();
+    actualizarIndicadorSync(false);
 
-    // Extraer pacientes únicos
+    const hoyStr = hoy.toISOString().split('T')[0];
+    let citasHoy = todasLasCitas.filter(c => c.fecha === hoyStr);
+
+    // Deduplicar citas de hoy: mismo teléfono + misma fecha = una sola cita
+    citasHoy = deduplicarCitas(citasHoy);
+
+    // Extraer pacientes únicos por teléfono normalizado (clave primaria)
     const pacientesMap = {};
     todasLasCitas.forEach(c => {
-        if (!pacientesMap[c.paciente]) {
-            pacientesMap[c.paciente] = { nombre: c.paciente, telefono: c.telefono, citas: 1 };
-        } else {
-            pacientesMap[c.paciente].citas++;
+        const telefonoNorm = normalizarTelefono(c.telefono);
+        // Usar teléfono normalizado como clave, ignorar entradas sin teléfono válido
+        if (telefonoNorm && telefonoNorm.length >= 7) {
+            if (!pacientesMap[telefonoNorm]) {
+                pacientesMap[telefonoNorm] = {
+                    nombre: c.paciente,
+                    telefono: c.telefono,
+                    telefonoNorm: telefonoNorm,
+                    citas: 1
+                };
+            } else {
+                pacientesMap[telefonoNorm].citas++;
+                // Mantener el nombre más reciente o más largo
+                if (c.paciente.length > pacientesMap[telefonoNorm].nombre.length) {
+                    pacientesMap[telefonoNorm].nombre = c.paciente;
+                }
+            }
         }
     });
     todosPacientes = Object.values(pacientesMap);
@@ -351,9 +486,43 @@ async function cargarDashboard() {
     document.getElementById('card-recurrentes')?.addEventListener('click', () => mostrarModalPacientes(pacientesRecurrentes, 'Pacientes Recurrentes (2+ citas)'));
 
     mostrarCitas(citasHoy, 'citas-hoy-lista');
+
+    // Mostrar notificación solo en actualización manual
+    if (!esAutoSync && ultimaActualizacion) {
+        console.log('✅ Dashboard actualizado manualmente a las', ultimaActualizacion.toLocaleTimeString());
+    }
 }
 
-document.getElementById('btn-refresh')?.addEventListener('click', cargarDashboard);
+// Iniciar auto-sync
+function iniciarAutoSync() {
+    // Detener timer anterior si existe
+    if (autoSyncTimer) {
+        clearInterval(autoSyncTimer);
+    }
+
+    // Iniciar nuevo timer
+    autoSyncTimer = setInterval(() => {
+        console.log('🔄 Auto-sync ejecutándose...');
+        cargarDashboard(true); // true = es auto-sync
+    }, AUTO_SYNC_INTERVAL);
+
+    console.log('⏱️ Auto-sync iniciado: cada ' + (AUTO_SYNC_INTERVAL / 1000) + ' segundos');
+}
+
+// Detener auto-sync (útil si se implementa toggle)
+function detenerAutoSync() {
+    if (autoSyncTimer) {
+        clearInterval(autoSyncTimer);
+        autoSyncTimer = null;
+        console.log('⏹️ Auto-sync detenido');
+    }
+}
+
+// Botón de actualización manual
+document.getElementById('btn-refresh')?.addEventListener('click', () => {
+    cargarDashboard(false); // false = actualización manual
+    showToast('Datos actualizados', 'success');
+});
 
 // ========================================
 // Modal de Pacientes
@@ -454,6 +623,9 @@ async function cargarAgenda() {
         }
     });
 
+    // Deduplicar citas: mismo teléfono + misma fecha = una sola cita
+    citasFecha = deduplicarCitas(citasFecha);
+
     document.getElementById('citas-count').textContent = `${citasFecha.length} cita${citasFecha.length !== 1 ? 's' : ''}`;
     mostrarCitas(citasFecha, 'citas-agenda-lista');
 }
@@ -499,18 +671,27 @@ async function cargarPacientes() {
         todasLasCitas = await cargarDatosDeGoogle();
     }
 
+    // Usar teléfono normalizado como clave primaria para deduplicación
     const pacientesMap = {};
     todasLasCitas.forEach(c => {
-        if (!pacientesMap[c.paciente]) {
-            pacientesMap[c.paciente] = {
-                nombre: c.paciente,
-                telefono: c.telefono,
-                especialidad: c.especialidad,
-                tipoSeguro: c.tipoSeguro,
-                citas: 1
-            };
-        } else {
-            pacientesMap[c.paciente].citas++;
+        const telefonoNorm = normalizarTelefono(c.telefono);
+        if (telefonoNorm && telefonoNorm.length >= 7) {
+            if (!pacientesMap[telefonoNorm]) {
+                pacientesMap[telefonoNorm] = {
+                    nombre: c.paciente,
+                    telefono: c.telefono,
+                    telefonoNorm: telefonoNorm,
+                    especialidad: c.especialidad,
+                    tipoSeguro: c.tipoSeguro,
+                    citas: 1
+                };
+            } else {
+                pacientesMap[telefonoNorm].citas++;
+                // Mantener el nombre más largo
+                if (c.paciente.length > pacientesMap[telefonoNorm].nombre.length) {
+                    pacientesMap[telefonoNorm].nombre = c.paciente;
+                }
+            }
         }
     });
 
@@ -780,13 +961,16 @@ async function cargarEstadisticas() {
     // Aplicar filtros activos
     const citasFiltradas = aplicarFiltros(todasLasCitas);
 
-    // Calcular pacientes únicos
+    // Calcular pacientes únicos por teléfono normalizado
     const pacientesMap = {};
     citasFiltradas.forEach(c => {
-        if (!pacientesMap[c.paciente]) {
-            pacientesMap[c.paciente] = { nombre: c.paciente, citas: 1 };
-        } else {
-            pacientesMap[c.paciente].citas++;
+        const telefonoNorm = normalizarTelefono(c.telefono);
+        if (telefonoNorm && telefonoNorm.length >= 7) {
+            if (!pacientesMap[telefonoNorm]) {
+                pacientesMap[telefonoNorm] = { nombre: c.paciente, telefono: c.telefono, citas: 1 };
+            } else {
+                pacientesMap[telefonoNorm].citas++;
+            }
         }
     });
     const pacientes = Object.values(pacientesMap);
@@ -804,39 +988,45 @@ async function cargarEstadisticas() {
     const seguros = contarOcurrencias(citasFiltradas, 'tipoSeguro');
     const motivos = contarOcurrencias(citasFiltradas, 'motivoPrincipal');
 
-    // Renderizar gráficos interactivos
+    // Renderizar gráficos interactivos (TODOS son clickeables ahora)
     renderizarBarrasInteractivas('chart-especialidades', especialidades, 'teal', 'especialidad');
     renderizarBarrasInteractivas('chart-seguro', seguros, 'coral', 'tipoSeguro');
-    renderizarBarras('chart-motivos', motivos.slice(0, 10), 'purple');
+    renderizarBarrasInteractivas('chart-motivos', motivos.slice(0, 10), 'purple', 'motivo');
 
     // ========================================
-    // Estadísticas Financieras
+    // Estadísticas Financieras (SOLO CITAS CONFIRMADAS)
     // ========================================
 
-    // Calcular ingresos totales
-    const ingresosTotales = citasFiltradas.reduce((sum, c) => sum + (c.precio || 0), 0);
-    const promedioPorCita = citasFiltradas.length > 0 ? Math.round(ingresosTotales / citasFiltradas.length) : 0;
+    // Filtrar solo citas confirmadas para cálculos financieros
+    const citasConfirmadas = citasFiltradas.filter(c => {
+        const citaId = generarCitaId(c);
+        return getCitaEstado(citaId) === 'confirmada';
+    });
 
-    // Ingresos por tipo de seguro
-    const ingresosSeguro = citasFiltradas.filter(c => c.tipoSeguro === 'Seguro Médico').reduce((sum, c) => sum + (c.precio || 0), 0);
-    const ingresosPrivado = citasFiltradas.filter(c => c.tipoSeguro === 'Privada').reduce((sum, c) => sum + (c.precio || 0), 0);
+    // Calcular ingresos totales (solo confirmadas)
+    const ingresosTotales = citasConfirmadas.reduce((sum, c) => sum + (c.precio || 0), 0);
+    const promedioPorCita = citasConfirmadas.length > 0 ? Math.round(ingresosTotales / citasConfirmadas.length) : 0;
 
-    // Actualizar tarjetas financieras
+    // Ingresos por tipo de seguro (solo confirmadas)
+    const ingresosSeguro = citasConfirmadas.filter(c => c.tipoSeguro === 'Seguro Médico').reduce((sum, c) => sum + (c.precio || 0), 0);
+    const ingresosPrivado = citasConfirmadas.filter(c => c.tipoSeguro === 'Privada').reduce((sum, c) => sum + (c.precio || 0), 0);
+
+    // Actualizar tarjetas financieras con contador de citas confirmadas
     document.getElementById('stats-ingresos-totales').textContent = `RD$ ${formatearNumero(ingresosTotales)}`;
     document.getElementById('stats-promedio-cita').textContent = `RD$ ${formatearNumero(promedioPorCita)}`;
     document.getElementById('stats-ingresos-seguro').textContent = `RD$ ${formatearNumero(ingresosSeguro)}`;
     document.getElementById('stats-ingresos-privado').textContent = `RD$ ${formatearNumero(ingresosPrivado)}`;
 
-    // Calcular ingresos por especialidad
-    const ingresosPorEspecialidad = calcularIngresosPorCampo(citasFiltradas, 'especialidad');
-    const ingresosPorSeguro = calcularIngresosPorCampo(citasFiltradas, 'tipoSeguro');
+    // Calcular ingresos por especialidad (solo confirmadas)
+    const ingresosPorEspecialidad = calcularIngresosPorCampo(citasConfirmadas, 'especialidad');
+    const ingresosPorSeguro = calcularIngresosPorCampo(citasConfirmadas, 'tipoSeguro');
 
-    // Renderizar gráficos financieros
-    renderizarBarrasIngresos('chart-ingresos-especialidad', ingresosPorEspecialidad, 'green');
-    renderizarBarrasIngresos('chart-ingresos-seguro', ingresosPorSeguro, 'blue');
+    // Renderizar gráficos financieros (interactivos)
+    renderizarBarrasIngresosInteractivas('chart-ingresos-especialidad', ingresosPorEspecialidad, 'green', 'especialidad');
+    renderizarBarrasIngresosInteractivas('chart-ingresos-seguro', ingresosPorSeguro, 'blue', 'tipoSeguro');
 
-    // Renderizar gráfico mensual
-    renderizarGraficoMensual(citasFiltradas);
+    // Renderizar gráfico mensual (solo confirmadas)
+    renderizarGraficoMensual(citasConfirmadas);
 
     // Mostrar/ocultar filtros activos
     actualizarUIFiltros();
@@ -856,6 +1046,12 @@ function aplicarFiltros(citas) {
         }
         if (filtrosActivos.tipoSeguro && c.tipoSeguro !== filtrosActivos.tipoSeguro) return false;
         if (filtrosActivos.mes && obtenerMesAnio(c.fechaTexto) !== filtrosActivos.mes) return false;
+        // Filtrar por motivo de consulta
+        if (filtrosActivos.motivo) {
+            const motivoLower = (c.motivoPrincipal || '').toLowerCase();
+            const filtroMotivo = filtrosActivos.motivo.toLowerCase();
+            if (!motivoLower.includes(filtroMotivo) && !filtroMotivo.includes(motivoLower)) return false;
+        }
         return true;
     });
 }
@@ -874,7 +1070,7 @@ function toggleFiltro(campo, valor) {
 }
 
 function limpiarTodosFiltros() {
-    filtrosActivos = { especialidad: null, tipoSeguro: null, mes: null };
+    filtrosActivos = { especialidad: null, tipoSeguro: null, mes: null, motivo: null };
     cargarEstadisticas();
 }
 
@@ -962,6 +1158,36 @@ function renderizarBarrasIngresos(containerId, datos, colorClass) {
         const porcentaje = Math.max((d.cantidad / maxValor) * 100, 1);
         return `
             <div class="bar-item">
+                <span class="bar-label" title="${d.nombre}">${truncar(d.nombre, 20)}</span>
+                <div class="bar-container">
+                    <div class="chart-bar-fill ${colorClass}" style="width: ${porcentaje}%"></div>
+                </div>
+                <span class="bar-count">RD$ ${formatearNumero(d.cantidad)}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// Renderizar barras de ingresos interactivas (clickeables)
+function renderizarBarrasIngresosInteractivas(containerId, datos, colorClass, campo) {
+    const container = document.getElementById(containerId);
+    if (!container || datos.length === 0) {
+        if (container) container.innerHTML = '<p class="empty-state">Sin ingresos confirmados</p>';
+        return;
+    }
+
+    const maxValor = Math.max(...datos.map(d => d.cantidad));
+    const filtroActivo = filtrosActivos[campo];
+
+    container.innerHTML = datos.map(d => {
+        const porcentaje = Math.max((d.cantidad / maxValor) * 100, 1);
+        const esActivo = filtroActivo === d.nombre;
+        const esDimmed = filtroActivo && !esActivo;
+
+        return `
+            <div class="bar-item ${esActivo ? 'active' : ''} ${esDimmed ? 'dimmed' : ''}"
+                 onclick="toggleFiltro('${campo}', '${d.nombre.replace(/'/g, "\\'")}')"
+                 style="cursor: pointer;">
                 <span class="bar-label" title="${d.nombre}">${truncar(d.nombre, 20)}</span>
                 <div class="bar-container">
                     <div class="chart-bar-fill ${colorClass}" style="width: ${porcentaje}%"></div>
