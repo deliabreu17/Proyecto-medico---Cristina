@@ -3053,3 +3053,21 @@ body.dark-mode .modal-content {
     font-size: 1.4rem !important;
 }
 
+
+/* Delete Button Fix */
+.btn-sm.btn-danger {
+    background: #fed7d7 !important;
+    color: #c53030 !important;
+    border: 1px solid #fc8181 !important;
+    padding: 8px 12px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    font-size: 1rem !important;
+    transition: all 0.2s ease !important;
+}
+.btn-sm.btn-danger:hover {
+    background: #c53030 !important;
+    color: white !important;
+    transform: scale(1.1) !important;
+}
+
