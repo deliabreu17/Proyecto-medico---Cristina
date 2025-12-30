@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema Médico - Dra. Cristina García</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="auditoria.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700&display=swap"
         rel="stylesheet">
@@ -136,6 +137,10 @@
                 <a href="#" class="nav-item" data-view="estadisticas">
                     <span class="nav-icon">📊</span>
                     Estadísticas
+                </a>
+                <a href="#" class="nav-item" data-view="auditoria" id="nav-auditoria" style="display: none;">
+                    <span class="nav-icon">🛡️</span>
+                    Auditoría
                 </a>
             </nav>
 
@@ -410,7 +415,80 @@
                     <button id="btn-limpiar-filtros" class="btn-limpiar">✕ Limpiar filtros</button>
                 </div>
             </section>
+
+            <!-- Audit View -->
+            <section id="view-auditoria" class="view" style="display: none;">
+                <header class="page-header">
+                    <div>
+                        <h2 class="page-title">🛡️ Auditoría de Acciones</h2>
+                        <p class="page-subtitle">Rastro de actividad (Secretaria y Admin)</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn-secondary" onclick="cargarAuditoria()">🔄 Actualizar</button>
+                    </div>
+                </header>
+                <div class="card" style="padding: 0;">
+                    <div class="table-container" style="max-height: 65vh; overflow-y: auto;">
+                        <table class="data-table" id="tabla-auditoria" style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Hora</th>
+                                    <th>Usuario</th>
+                                    <th>Rol</th>
+                                    <th>Acción</th>
+                                    <th>Detalle</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-auditoria">
+                                <!-- JS Injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
         </main>
+    </div>
+
+    <!-- Modal Cancelación Obligatoria -->
+    <div id="modal-cancelacion" class="modal-overlay" style="display: none; z-index: 2000;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>🚫 Cancelar Cita</h3>
+                <button class="modal-close" onclick="cerrarModalCancelacion()">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-gray); margin-bottom: 15px;">
+                    Para cancelar esta cita, es <strong>obligatorio</strong> seleccionar un motivo.
+                </p>
+
+                <div class="form-group">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">Motivo de Cancelación <span
+                            style="color:red">*</span></label>
+                    <select id="motivo-cancelacion" class="form-input" style="width: 100%;">
+                        <option value="">-- Seleccione un motivo --</option>
+                        <option value="Paciente no asiste (No Show)">Paciente no asiste (No Show)</option>
+                        <option value="Paciente solicitó cancelación">Paciente solicitó cancelación</option>
+                        <option value="Paciente reagendó">Paciente reagendó fecha</option>
+                        <option value="Médico no disponible">Médico no disponible / Emergencia</option>
+                        <option value="Error de registro">Error de registro / Duplicado</option>
+                        <option value="Falta de recursos/pago">Falta de recursos / Seguro rechazado</option>
+                        <option value="Otro">Otro (Especificar abajo)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-top: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">Observaciones
+                        Adicionales</label>
+                    <textarea id="nota-cancelacion" class="form-input" rows="3"
+                        placeholder="Detalles adicionales sobre la cancelación..." style="width: 100%;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="cerrarModalCancelacion()">Volver</button>
+                <button class="btn-danger" onclick="confirmarCancelacionFinal()">🚨 Confirmar Cancelación</button>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Container -->

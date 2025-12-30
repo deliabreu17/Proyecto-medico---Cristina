@@ -82,6 +82,12 @@ function aplicarPermisosRol() {
     if (statsNav) {
         statsNav.style.display = esSecretaria ? 'none' : 'flex';
     }
+
+    // Auditoría solo Admin
+    const auditNav = document.getElementById('nav-auditoria');
+    if (auditNav) {
+        auditNav.style.display = esSecretaria ? 'none' : 'flex';
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -650,17 +656,26 @@ async function confirmarCita(citaId) {
     const confirmado = await showConfirm('¿Estás seguro de que deseas confirmar esta cita?', 'Confirmar Cita');
     if (confirmado) {
         setCitaEstado(citaId, 'confirmada');
+        // Registrar Auditoría
+        registrarAuditoria('Confirmar Cita', `Cita confirmada ID: ${citaId}`, { citaId });
+
         showToast('Cita confirmada exitosamente', 'success');
         recargarVistaActual();
     }
 }
 
-async function cancelarCita(citaId) {
-    const confirmado = await showConfirm('¿Deseas cancelar esta cita? Esta acción no se puede deshacer.', 'Cancelar Cita');
-    if (confirmado) {
-        setCitaEstado(citaId, 'cancelada');
-        showToast('Cita cancelada', 'info');
-        recargarVistaActual();
+// Variable temporal para el ID de la cita a cancelar
+let citaCancelacionId = null;
+
+function cancelarCita(citaId) {
+    // Abrir modal de motivo obligatorio
+    citaCancelacionId = citaId;
+    const modal = document.getElementById('modal-cancelacion');
+    if (modal) {
+        modal.style.display = 'flex';
+        // Resetear form
+        document.getElementById('motivo-cancelacion').value = "";
+        document.getElementById('nota-cancelacion').value = "";
     }
 }
 
@@ -687,8 +702,13 @@ function reagendarCita(citaId) {
                 lista.push(nuevaCita);
                 localStorage.setItem('citasReagendadas', JSON.stringify(lista));
 
-                // Marcar original como "reagendada" (oculta de vista normal o marcada)
+                // Marcar original como "reagendada"
                 setCitaEstado(citaId, 'reagendada');
+
+                // Log Auditoría
+                registrarAuditoria('Reagendar Cita', `Reagendada para ${nuevaFechaStr}. ID Original: ${citaId}`, {
+                    citaId, nuevaFecha: nuevaFechaStr
+                });
 
                 showToast(`Cita reagendada para el ${nuevaFechaStr}`, 'success');
                 recargarVistaActual();
@@ -2400,5 +2420,136 @@ if (globalSearchInput && globalSearchResults) {
             globalSearchResults.style.display = 'none';
         }
     });
+}
+
+// ========================================
+// SISTEMA DE AUDITORÍA Y CANCELACIÓN
+// ========================================
+
+function cerrarModalCancelacion() {
+    citaCancelacionId = null;
+    const modal = document.getElementById('modal-cancelacion');
+    if (modal) modal.style.display = 'none';
+}
+
+function confirmarCancelacionFinal() {
+    const motivoSelect = document.getElementById('motivo-cancelacion');
+    const notaInput = document.getElementById('nota-cancelacion');
+    const motivo = motivoSelect.value;
+    const nota = notaInput.value;
+
+    if (!motivo) {
+        showToast('Debes seleccionar un motivo obligatoriamente', 'error');
+        motivoSelect.focus();
+        return;
+    }
+
+    if (citaCancelacionId) {
+        // Ejecutar cancelación
+        setCitaEstado(citaCancelacionId, 'cancelada');
+
+        // Registrar Log detallado
+        registrarAuditoria('Cancelar Cita', `Motivo: ${motivo}. Detalles: ${nota || 'N/A'}`, {
+            citaId: citaCancelacionId,
+            motivo: motivo,
+            nota: nota
+        });
+
+        showToast('Cita cancelada y motivo registrado', 'info');
+        cerrarModalCancelacion();
+        recargarVistaActual();
+    }
+}
+
+// Logs Lógica
+function registrarAuditoria(accion, detalle, metadata = {}) {
+    try {
+        const logs = JSON.parse(localStorage.getItem('auditLogs') || '[]');
+        const nuevoLog = {
+            id: Date.now(),
+            fecha: new Date().toISOString(),
+            fechaLocal: new Date().toLocaleString('es-DO'),
+            usuario: (window.usuarioActual && window.usuarioActual.nombre) ? window.usuarioActual.nombre : 'Sistema',
+            rol: (window.usuarioActual && window.usuarioActual.rol) ? window.usuarioActual.rol : 'N/A',
+            accion: accion,
+            detalle: detalle,
+            metadata: metadata
+        };
+        logs.unshift(nuevoLog); // LIFO
+        // Limpiar antiguos (>1000)
+        if (logs.length > 1000) logs.length = 1000;
+
+        localStorage.setItem('auditLogs', JSON.stringify(logs));
+        console.log('Auditoría registrada:', accion);
+    } catch (e) {
+        console.error('Error guardando auditoría', e);
+    }
+}
+
+function cargarAuditoria() {
+    const logs = JSON.parse(localStorage.getItem('auditLogs') || '[]');
+    const tbody = document.getElementById('lista-auditoria');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; color: var(--text-gray);">Sin registros de actividad reciente</td></tr>';
+        return;
+    }
+
+    logs.forEach(log => {
+        const row = document.createElement('tr');
+        // Fecha display simple
+        const d = new Date(log.fecha);
+        const fechaStr = d.toLocaleDateString('es-DO');
+        const horaStr = d.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+
+        const badgeClass = log.rol === 'Administrador' ? 'badge-admin' : (log.rol === 'Secretaria' ? 'badge-secretaria' : 'badge-neutral');
+
+        row.innerHTML = `
+            <td>${fechaStr}</td>
+            <td>${horaStr}</td>
+            <td><strong>${log.usuario}</strong></td>
+            <td><span class="badge ${badgeClass}">${log.rol}</span></td>
+            <td>${log.accion}</td>
+            <td style="font-size: 0.9em; color: #555;">${log.detalle}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function exportarAuditoriaCSV() {
+    const logs = JSON.parse(localStorage.getItem('auditLogs') || '[]');
+    if (logs.length === 0) {
+        showToast('No hay datos para exportar', 'warning');
+        return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "ID,FechaISO,FechaLocal,Usuario,Rol,Accion,Detalle\n";
+
+    logs.forEach(log => {
+        // Escapar comillas
+        const detalleSafe = (log.detalle || '').replace(/"/g, '""');
+        const row = [
+            log.id,
+            log.fecha,
+            `"${log.fechaLocal}"`,
+            `"${log.usuario}"`,
+            log.rol,
+            `"${log.accion}"`,
+            `"${detalleSafe}"`
+        ];
+        csvContent += row.join(",") + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `auditoria_sistema_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 

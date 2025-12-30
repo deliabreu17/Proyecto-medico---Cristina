@@ -1,0 +1,58 @@
+/* =========================================
+   Auditoría View Styles
+   ========================================= */
+.badge-admin {
+    background-color: #6C5CE7;
+    /* Morado Admin */
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.badge-secretaria {
+    background-color: #00CEC9;
+    /* Cyan Secretaria */
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.badge-neutral {
+    background-color: #95a5a6;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85em;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+#tabla-auditoria {
+    border-collapse: collapse;
+}
+
+#tabla-auditoria th {
+    background-color: #f8f9fa;
+    color: var(--text-dark);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+}
+
+#tabla-auditoria td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+    color: var(--text-dark);
+}
+
+#tabla-auditoria tr:hover {
+    background-color: #fcfcfc;
+}
