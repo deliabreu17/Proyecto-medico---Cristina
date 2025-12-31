@@ -2277,9 +2277,14 @@ function mostrarHistorialPaciente(identificador) {
                                     <div class="history-date" style="font-weight: 600; color: #2c3e50;">📅 ${c.fechaTexto || 'Sin fecha'}</div>
                                     <span style="padding: 4px 10px; border-radius: 20px; font-size: 0.8em; background: ${estado === 'completada' ? '#d4edda' : estado === 'cancelada' ? '#f8d7da' : estado === 'confirmada' ? '#cce5ff' : '#fff3cd'}; color: ${estado === 'completada' ? '#155724' : estado === 'cancelada' ? '#721c24' : estado === 'confirmada' ? '#004085' : '#856404'};">${estadoTexto}</span>
                                 </div>
-                                <div class="history-details" style="color: #555;">
-                                    🩺 ${c.especialidad} • 📋 ${c.motivoPrincipal} • 💳 ${c.tipoSeguro}
+                                <div class="history-details" style="color: #555; line-height: 1.6;">
+                                    <div>🎂 <strong>Edad:</strong> ${c.edad || 'N/A'}</div>
+                                    <div>🩺 <strong>Especialidad:</strong> ${c.especialidad}</div>
+                                    <div>📋 <strong>Motivo:</strong> ${c.motivoPrincipal}</div>
+                                    <div>💳 <strong>Tipo:</strong> ${c.tipoSeguro}${c.tipoSeguro === 'Seguro Médico' && c.nombreArs ? ` - <span style="color: #2980b9;">${c.nombreArs}</span>` : ''}</div>
+                                    ${c.tipoSeguro === 'Seguro Médico' && c.numeroAfiliado ? `<div>🆔 <strong>Afiliado:</strong> ${c.numeroAfiliado}</div>` : ''}
                                 </div>
+
                                 ${notasHTML}
                                 <button class="btn-add-note" onclick="agregarNota('${citaId}')" style="margin-top: 10px; padding: 6px 12px; font-size: 0.85em;">📝 Agregar nota</button>
                             </div>
