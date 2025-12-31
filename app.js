@@ -366,21 +366,32 @@ function normalizarTelefono(telefono) {
     return telefono.replace(/\D/g, '');
 }
 
-// Deduplicar citas: mismo teléfono + misma fecha = mismo paciente
+// Deduplicar citas: mismo teléfono + misma fecha + misma especialidad = misma cita
 // Mantiene la cita con el nombre más largo/completo
 function deduplicarCitas(citas) {
     const citasUnicas = {};
 
     citas.forEach(cita => {
         const telefonoNorm = normalizarTelefono(cita.telefono);
-        // Clave única: teléfono + fecha
-        const clave = `${telefonoNorm}_${cita.fecha}`;
+
+        // Normalizar fecha a formato consistente YYYY-MM-DD
+        let fechaNorm = '';
+        if (cita.fecha instanceof Date && !isNaN(cita.fecha)) {
+            fechaNorm = `${cita.fecha.getFullYear()}-${String(cita.fecha.getMonth() + 1).padStart(2, '0')}-${String(cita.fecha.getDate()).padStart(2, '0')}`;
+        } else if (cita.fechaTexto) {
+            // Intentar parsear fechaTexto
+            fechaNorm = cita.fechaTexto.toLowerCase().trim();
+        }
+
+        // Clave única: teléfono + fecha normalizada + especialidad
+        const especialidadNorm = (cita.especialidad || '').toLowerCase().trim();
+        const clave = `${telefonoNorm}_${fechaNorm}_${especialidadNorm}`;
 
         if (!citasUnicas[clave]) {
             // Primera vez que vemos esta combinación
             citasUnicas[clave] = cita;
         } else {
-            // Ya existe una cita para este teléfono+fecha
+            // Ya existe una cita para esta combinación
             // Mantener la que tiene el nombre más largo (más completo)
             if (cita.paciente.length > citasUnicas[clave].paciente.length) {
                 citasUnicas[clave] = cita;
@@ -391,6 +402,7 @@ function deduplicarCitas(citas) {
     console.log(`📋 Deduplicación: ${citas.length} citas → ${Object.keys(citasUnicas).length} únicas`);
     return Object.values(citasUnicas);
 }
+
 
 function parsearLinea(linea) {
     const valores = [];
@@ -2195,7 +2207,9 @@ function mostrarHistorialPaciente(identificador) {
         }
     }
 
-    const citasPaciente = citasFiltradas; // Alias para compatibilidad con resto de fn
+    // *** DEDUPLICAR citas del paciente para evitar fantasmas ***
+    const citasPaciente = deduplicarCitas(citasFiltradas);
+
 
     if (citasPaciente.length === 0) {
         showToast('No se encontró historial con ese criterio', 'warning');
