@@ -953,9 +953,12 @@ async function cargarPacientes() {
         todasLasCitas = await cargarDatosDeGoogle();
     }
 
+    // *** DEDUPLICAR antes de contar para sincronizar con historial ***
+    const citasDeduplicadas = deduplicarCitas(todasLasCitas);
+
     // Usar teléfono normalizado como clave primaria para deduplicación
     const pacientesMap = {};
-    todasLasCitas.forEach(c => {
+    citasDeduplicadas.forEach(c => {
         const telefonoNorm = normalizarTelefono(c.telefono);
         if (telefonoNorm && telefonoNorm.length >= 7) {
             if (!pacientesMap[telefonoNorm]) {
@@ -981,6 +984,7 @@ async function cargarPacientes() {
     document.getElementById('pacientes-count').textContent = `${todosPacientes.length} pacientes registrados`;
     mostrarPacientesLista(todosPacientes);
 }
+
 
 function mostrarPacientesLista(pacientes) {
     const container = document.getElementById('pacientes-lista');
