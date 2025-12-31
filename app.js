@@ -2019,29 +2019,87 @@ document.getElementById('btn-print-agenda')?.addEventListener('click', () => {
 });
 
 // ========================================
-// Notas en Citas
+// Notas en Citas (Sistema Acumulativo - Cloud)
 // ========================================
-function getCitaNotas(citaId) {
-    const notas = localStorage.getItem('citasNotas');
-    if (!notas) return '';
-    const notasObj = JSON.parse(notas);
-    return notasObj[citaId] || '';
+
+// Obtener todas las notas de una cita (array de objetos)
+function getCitaNotasArray(citaId) {
+    const estados = getCitasEstado();
+    const notaId = `NOTAS_${citaId}`;
+    const entry = estados[notaId];
+    if (entry && entry.estado) {
+        try {
+            const data = JSON.parse(entry.estado);
+            return Array.isArray(data.notas) ? data.notas : [];
+        } catch (e) { return []; }
+    }
+    return [];
 }
 
-function setCitaNotas(citaId, nota) {
-    const notas = localStorage.getItem('citasNotas');
-    const notasObj = notas ? JSON.parse(notas) : {};
-    notasObj[citaId] = nota;
-    localStorage.setItem('citasNotas', JSON.stringify(notasObj));
+// Obtener notas formateadas como texto para mostrar en citas
+function getCitaNotas(citaId) {
+    const notas = getCitaNotasArray(citaId);
+    if (notas.length === 0) return '';
+    // Mostrar solo la última nota con indicador de cantidad
+    const ultima = notas[notas.length - 1];
+    const cantidad = notas.length > 1 ? ` (+${notas.length - 1} más)` : '';
+    return `${ultima.texto}${cantidad}`;
+}
+
+// Agregar nueva nota (no edita, solo agrega)
+async function setCitaNotas(citaId, textoNota) {
+    const notaId = `NOTAS_${citaId}`;
+    const notasExistentes = getCitaNotasArray(citaId);
+
+    // Obtener usuario actual
+    let usuario = 'Sistema';
+    if (typeof usuarioActual !== 'undefined' && usuarioActual) {
+        usuario = usuarioActual.nombre || 'Usuario';
+    }
+
+    // Agregar nueva nota al array
+    notasExistentes.push({
+        texto: textoNota,
+        usuario: usuario,
+        fecha: new Date().toISOString(),
+        ts: Date.now()
+    });
+
+    // Guardar en la nube
+    await setCitaEstado(notaId, JSON.stringify({ notas: notasExistentes }));
 }
 
 function agregarNota(citaId) {
-    const notaExistente = getCitaNotas(citaId);
-
     const modal = document.getElementById('note-modal');
     if (modal) {
         document.getElementById('note-cita-id').value = citaId;
-        document.getElementById('note-input').value = notaExistente;
+        document.getElementById('note-input').value = ''; // Siempre vacío para nueva nota
+
+        // Mostrar historial de notas existentes
+        const notasExistentes = getCitaNotasArray(citaId);
+        const historialContainer = document.getElementById('notas-historial');
+
+        if (historialContainer) {
+            if (notasExistentes.length > 0) {
+                historialContainer.innerHTML = `
+                    <div style="margin-bottom: 15px; padding: 12px; background: #f8f9fa; border-radius: 8px; max-height: 150px; overflow-y: auto;">
+                        <p style="font-weight: 600; margin-bottom: 8px; color: #555;">📋 Historial de Notas:</p>
+                        ${notasExistentes.map(n => {
+                    const fecha = new Date(n.fecha);
+                    const fechaStr = fecha.toLocaleDateString('es-DO');
+                    const horaStr = fecha.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+                    return `<div style="padding: 8px; margin-bottom: 6px; background: white; border-radius: 6px; border-left: 3px solid #3498db;">
+                                <small style="color: #888;">${fechaStr} ${horaStr} - <strong>${n.usuario}</strong></small>
+                                <p style="margin: 4px 0 0 0; color: #333;">${n.texto}</p>
+                            </div>`;
+                }).join('')}
+                    </div>
+                `;
+            } else {
+                historialContainer.innerHTML = '<p style="color: #888; font-size: 0.9em; margin-bottom: 10px;">Sin notas previas</p>';
+            }
+        }
+
         modal.style.display = 'flex';
         setTimeout(() => {
             const input = document.getElementById('note-input');
@@ -2057,21 +2115,37 @@ function cerrarModalNota() {
     if (modal) modal.style.display = 'none';
 }
 
-function guardarNotaModal() {
+async function guardarNotaModal() {
     const citaId = document.getElementById('note-cita-id').value;
-    const nuevaNota = document.getElementById('note-input').value;
+    const nuevaNota = document.getElementById('note-input').value.trim();
 
-    setCitaNotas(citaId, nuevaNota);
-    showToast('Nota guardada correctamente', 'success');
+    if (!nuevaNota) {
+        showToast('Escriba una nota antes de guardar', 'warning');
+        return;
+    }
+
+    await setCitaNotas(citaId, nuevaNota);
+    showToast('Nota agregada correctamente', 'success');
     cerrarModalNota();
 
-    // Recargar vista
+    // Recargar vista actual
     if (document.getElementById('view-citas').classList.contains('active')) {
         cargarAgenda();
-    } else {
+    } else if (document.getElementById('view-dashboard').classList.contains('active')) {
         cargarDashboard();
     }
+
+    // Si hay modal de historial abierto, refrescarlo
+    const modalHistorial = document.getElementById('modal-historial');
+    if (modalHistorial && modalHistorial.style.display === 'flex') {
+        // Re-abrir historial del paciente para refrescar
+        const citaActual = todasLasCitas.find(c => generarCitaId(c) === citaId);
+        if (citaActual) {
+            mostrarHistorialPaciente(obtenerIdPaciente(citaActual));
+        }
+    }
 }
+
 
 // Helper para obtener ID seguro (Telefone o Nombre)
 function obtenerIdPaciente(cita) {
@@ -2153,12 +2227,12 @@ function mostrarHistorialPaciente(identificador) {
     const ultimoTel = citasPaciente[0].telefono;
 
     modal.innerHTML = `
-        <div class="modal-content history-modal-content">
+        <div class="modal-content history-modal-content" style="max-width: 700px;">
             <div class="modal-header">
                 <h3>📋 Historial de ${nombrePaciente}</h3>
                 <button class="modal-close" onclick="cerrarModalHistorial()">×</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
                 <p style="margin-bottom: 16px; color: var(--text-gray);">
                     🔍 Criterio: ${esBusquedaPorTelefono ? 'Teléfono' : 'Nombre'} • 📞 ${ultimoTel} • <strong>${totalCitas}</strong> cita${totalCitas !== 1 ? 's' : ''}
                 </p>
@@ -2166,17 +2240,48 @@ function mostrarHistorialPaciente(identificador) {
                     ${citasPaciente.map(c => {
         const citaId = generarCitaId(c);
         const estado = getCitaEstado(citaId);
-        const notas = getCitaNotas(citaId);
-        const estadoInfo = c.estado === 'cancelada' ? '❌ Cancelada' : (estado === 'confirmada' ? '✅ Confirmada' : '⏳ Pendiente');
+        const notasArray = getCitaNotasArray(citaId);
+
+        // Mapear estados para display
+        const estadoLabels = {
+            'pendiente': '⏳ Pendiente',
+            'confirmada': '✅ Confirmada',
+            'cancelada': '❌ Cancelada',
+            'reagendada': '📅 Reagendada',
+            'completada': '✔️ Completada'
+        };
+        const estadoTexto = estadoLabels[estado] || estadoLabels.pendiente;
+
+        // Renderizar notas detalladas
+        let notasHTML = '';
+        if (notasArray.length > 0) {
+            notasHTML = `
+                <div style="margin-top: 10px; padding: 10px; background: #f0f4f8; border-radius: 8px;">
+                    <p style="font-weight: 600; font-size: 0.85em; color: #555; margin-bottom: 6px;">📝 Notas (${notasArray.length}):</p>
+                    ${notasArray.map(n => {
+                const fecha = new Date(n.fecha);
+                const fechaStr = fecha.toLocaleDateString('es-DO');
+                const horaStr = fecha.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+                return `<div style="padding: 6px 8px; margin-bottom: 4px; background: white; border-radius: 4px; border-left: 3px solid #3498db; font-size: 0.9em;">
+                            <small style="color: #888;">${fechaStr} ${horaStr} - <strong>${n.usuario}</strong></small>
+                            <p style="margin: 2px 0 0 0; color: #333;">${n.texto}</p>
+                        </div>`;
+            }).join('')}
+                </div>
+            `;
+        }
 
         return `
-                            <div class="history-item">
-                                <div class="history-date">📅 ${c.fechaTexto || 'Sin fecha'}</div>
-                                <div class="history-details">
-                                    🩺 ${c.especialidad} • 📋 ${c.motivoPrincipal} • 💳 ${c.tipoSeguro}
-                                    <br>Estado: <strong>${estado}</strong>
-                                    ${notas ? `<br>📝 <em>${notas}</em>` : ''}
+                            <div class="history-item" style="padding: 15px; margin-bottom: 12px; background: #fafbfc; border-radius: 10px; border: 1px solid #e1e5e9;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <div class="history-date" style="font-weight: 600; color: #2c3e50;">📅 ${c.fechaTexto || 'Sin fecha'}</div>
+                                    <span style="padding: 4px 10px; border-radius: 20px; font-size: 0.8em; background: ${estado === 'completada' ? '#d4edda' : estado === 'cancelada' ? '#f8d7da' : estado === 'confirmada' ? '#cce5ff' : '#fff3cd'}; color: ${estado === 'completada' ? '#155724' : estado === 'cancelada' ? '#721c24' : estado === 'confirmada' ? '#004085' : '#856404'};">${estadoTexto}</span>
                                 </div>
+                                <div class="history-details" style="color: #555;">
+                                    🩺 ${c.especialidad} • 📋 ${c.motivoPrincipal} • 💳 ${c.tipoSeguro}
+                                </div>
+                                ${notasHTML}
+                                <button class="btn-add-note" onclick="agregarNota('${citaId}')" style="margin-top: 10px; padding: 6px 12px; font-size: 0.85em;">📝 Agregar nota</button>
                             </div>
                         `;
     }).join('')}
@@ -2184,6 +2289,7 @@ function mostrarHistorialPaciente(identificador) {
             </div>
         </div>
     `;
+
 
     modal.style.display = 'flex';
 
