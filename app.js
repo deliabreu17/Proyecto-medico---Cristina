@@ -3190,7 +3190,7 @@ function eliminarTransaccion(id) {
     };
 }
 
-function ejecutarEliminacionTransaccion() {
+async function ejecutarEliminacionTransaccion() {
     const id = transaccionAEliminar;
     console.log('[DELETE] Ejecutando eliminación de:', id);
 
@@ -3200,20 +3200,10 @@ function ejecutarEliminacionTransaccion() {
     }
 
     try {
-        // Obtener estados actuales
-        const estadosStr = localStorage.getItem('citasEstado') || '{}';
-        const estados = JSON.parse(estadosStr);
+        // Marcar como eliminado en la nube usando setCitaEstado
+        await setCitaEstado(id, JSON.stringify({ deleted: true }));
 
-        // Marcar como eliminado
-        estados[id] = {
-            estado: JSON.stringify({ deleted: true }),
-            fecha: new Date().toISOString()
-        };
-
-        // Guardar
-        localStorage.setItem('citasEstado', JSON.stringify(estados));
-
-        console.log('[DELETE] Transacción eliminada:', id);
+        console.log('[DELETE] Transacción eliminada en la nube:', id);
         showToast('Transacción eliminada correctamente', 'success');
 
         // Limpiar
@@ -3227,6 +3217,7 @@ function ejecutarEliminacionTransaccion() {
         showToast('Error al eliminar', 'error');
     }
 }
+
 
 // Limpiar Filtros
 function limpiarFiltrosFinanzas() {
