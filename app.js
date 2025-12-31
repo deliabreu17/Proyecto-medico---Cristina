@@ -574,9 +574,12 @@ async function cargarDashboard(esAutoSync = false) {
     // Deduplicar citas de hoy: mismo teléfono + misma fecha = una sola cita
     citasHoy = deduplicarCitas(citasHoy);
 
+    // *** DEDUPLICAR todas las citas para conteos consistentes ***
+    const citasDeduplicadas = deduplicarCitas(todasLasCitas);
+
     // Extraer pacientes únicos por teléfono normalizado (clave primaria)
     const pacientesMap = {};
-    todasLasCitas.forEach(c => {
+    citasDeduplicadas.forEach(c => {
         const telefonoNorm = normalizarTelefono(c.telefono);
         // Usar teléfono normalizado como clave, ignorar entradas sin teléfono válido
         if (telefonoNorm && telefonoNorm.length >= 7) {
@@ -604,7 +607,7 @@ async function cargarDashboard(esAutoSync = false) {
 
     document.getElementById('stat-citas-hoy').textContent = citasHoy.length;
     document.getElementById('stat-pacientes').textContent = todosPacientes.length;
-    document.getElementById('stat-total').textContent = todasLasCitas.length;
+    document.getElementById('stat-total').textContent = citasDeduplicadas.length;
     document.getElementById('stat-nuevos').textContent = pacientesNuevos.length;
     document.getElementById('stat-recurrentes').textContent = pacientesRecurrentes.length;
 
@@ -1260,8 +1263,11 @@ async function cargarEstadisticas() {
         todasLasCitas = await cargarDatosDeGoogle();
     }
 
-    // Aplicar filtros activos
-    const citasFiltradas = aplicarFiltros(todasLasCitas);
+    // *** DEDUPLICAR primero para estadísticas consistentes ***
+    const citasDeduplicadas = deduplicarCitas(todasLasCitas);
+
+    // Aplicar filtros activos sobre citas deduplicadas
+    const citasFiltradas = aplicarFiltros(citasDeduplicadas);
 
     // Calcular pacientes únicos por teléfono normalizado
     const pacientesMap = {};
@@ -1281,6 +1287,7 @@ async function cargarEstadisticas() {
 
     // Actualizar contadores
     document.getElementById('stats-total-citas').textContent = citasFiltradas.length;
+
     document.getElementById('stats-total-pacientes').textContent = pacientes.length;
     document.getElementById('stats-nuevos').textContent = nuevos.length;
     document.getElementById('stats-recurrentes').textContent = recurrentes.length;
