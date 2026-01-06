@@ -465,7 +465,7 @@ function parsearFecha(fechaStr) {
         if (mes) {
             let año;
 
-            // Primero intentar extraer el año del texto (nuevo formato: "de 2025")
+            // Primero intentar extraer el año del texto (formato: "de 2025")
             const matchAño = str.match(/de\s+(\d{4})/);
             if (matchAño) {
                 año = parseInt(matchAño[1], 10);
@@ -473,14 +473,18 @@ function parsearFecha(fechaStr) {
                 // Si no tiene año, calcularlo automáticamente
                 const hoy = new Date();
                 año = hoy.getFullYear();
-
-                // Lógica mejorada para detectar si la cita es del próximo año:
-                // Si estamos en los últimos meses del año (oct-dic) y la cita es para
-                // los primeros meses (ene-mar), asumimos que es para el próximo año
                 const mesActual = hoy.getMonth() + 1; // 1-12
                 const mesNum = parseInt(mes, 10);
 
-                if (mesNum <= 3 && mesActual >= 10) {
+                // Lógica mejorada para detectar año correcto:
+                // 1. Si estamos en ene-mar y la cita es oct-dic, la cita es del año ANTERIOR
+                // 2. Si estamos en oct-dic y la cita es ene-mar, la cita es del año SIGUIENTE
+
+                if (mesActual <= 3 && mesNum >= 10) {
+                    // Estamos en enero-marzo, cita de octubre-diciembre = año anterior
+                    año = año - 1;
+                } else if (mesActual >= 10 && mesNum <= 3) {
+                    // Estamos en octubre-diciembre, cita de enero-marzo = próximo año
                     año = año + 1;
                 }
             }
@@ -501,6 +505,7 @@ function parsearFecha(fechaStr) {
     console.log(`⚠️ No se pudo parsear la fecha: "${fechaStr}"`);
     return null;
 }
+
 
 // ========================================
 // Dashboard
