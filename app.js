@@ -144,7 +144,24 @@ async function cargarDatosDeGoogle() {
     try {
         const response = await fetch(CORS_PROXY + encodeURIComponent(SHEET_URL));
         const csv = await response.text();
-        return parsearCSV(csv);
+        const citas = parsearCSV(csv);
+
+        // Inject manual appointments
+        const estados = getCitasEstado();
+        Object.keys(estados).forEach(key => {
+            if (key.startsWith('DATOS_MANUAL_')) {
+                try {
+                    const data = JSON.parse(estados[key].estado);
+                    if (data && data.cita && !data.deleted) {
+                        const cita = data.cita;
+                        cita.creadoEn = new Date(cita.creadoEn);
+                        citas.push(cita);
+                    }
+                } catch(e) {}
+            }
+        });
+
+        return citas;
     } catch (error) {
         console.error('Error cargando Google Sheets:', error);
         return [];
@@ -1119,6 +1136,7 @@ setInterval(sincronizarEstados, 30000);
 
 // Generar ID único para cita basado en datos
 function generarCitaId(cita) {
+    if (cita.id && String(cita.id).startsWith('MANUAL_')) return String(cita.id);
     return `${cita.paciente}_${cita.fecha}_${cita.telefono}`.replace(/[^a-zA-Z0-9]/g, '_');
 }
 
@@ -2476,6 +2494,11 @@ window.cancelarCita = cancelarCita;
 window.reagendarCita = reagendarCita;
 window.cerrarModalNota = cerrarModalNota;
 window.guardarNotaModal = guardarNotaModal;
+window.iniciarCitaManual = iniciarCitaManual;
+window.cerrarModalCitaManual = cerrarModalCitaManual;
+window.guardarCitaManual = guardarCitaManual;
+window.toggleManualArs = toggleManualArs;
+window.verificarPasswordGlobal = verificarPasswordGlobal;
 
 // ========================================
 // Centro de Notificaciones (Citas Recientes)
@@ -2820,6 +2843,7 @@ async function exportarAuditoriaCSV() {
 // SISTEMA DE RESTAURACIÓN (UNDO)
 // ========================================
 let citaRestaurarId = null;
+let actionToAuthenticate = null;
 
 function iniciarRestauracion(citaId) {
     // Verificar rol
@@ -2831,6 +2855,7 @@ function iniciarRestauracion(citaId) {
     } else {
         // Secretaria: Requiere clave
         citaRestaurarId = citaId;
+        actionToAuthenticate = 'restaurar';
         const modal = document.getElementById('modal-password-auth');
         if (modal) {
             modal.style.display = 'flex';
@@ -2842,14 +2867,19 @@ function iniciarRestauracion(citaId) {
 
 function cerrarModalPassword() {
     citaRestaurarId = null;
+    actionToAuthenticate = null;
     const modal = document.getElementById('modal-password-auth');
     if (modal) modal.style.display = 'none';
 }
 
-function verificarPasswordRestauracion() {
+function verificarPasswordGlobal() {
     const pass = document.getElementById('auth-password').value;
     if (pass === 'cristina17') {
-        ejecutarRestauracion(citaRestaurarId);
+        if (actionToAuthenticate === 'restaurar') {
+            ejecutarRestauracion(citaRestaurarId);
+        } else if (actionToAuthenticate === 'cita_manual') {
+            abrirModalCitaManual();
+        }
         cerrarModalPassword();
     } else {
         showToast('Contraseña Incorrecta. Acceso Denegado.', 'error');
@@ -2870,6 +2900,132 @@ async function ejecutarRestauracion(citaId) {
     });
 
     showToast('Cita restaurada correctamente', 'success');
+    recargarVistaActual();
+}
+
+// ========================================
+// INGRESO MANUAL DE CITAS
+// ========================================
+
+function iniciarCitaManual() {
+    actionToAuthenticate = 'cita_manual';
+    const modal = document.getElementById('modal-password-auth');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.getElementById('auth-password').value = '';
+        document.getElementById('auth-password').focus();
+    }
+}
+
+function abrirModalCitaManual() {
+    const modal = document.getElementById('modal-cita-manual');
+    if (modal) {
+        // Reset form
+        document.getElementById('manual-nombre').value = '';
+        document.getElementById('manual-telefono').value = '';
+        document.getElementById('manual-edad').value = '';
+        document.getElementById('manual-fecha').value = formatearFechaLocal(fechaSeleccionada || new Date());
+        document.getElementById('manual-especialidad').value = 'Cardiología Pediátrica';
+        document.getElementById('manual-motivo').value = '';
+        document.getElementById('manual-seguro-tipo').value = 'Privada';
+        document.getElementById('manual-ars').value = '';
+        document.getElementById('manual-afiliado').value = '';
+        toggleManualArs();
+        
+        modal.style.display = 'flex';
+    }
+}
+
+function cerrarModalCitaManual() {
+    const modal = document.getElementById('modal-cita-manual');
+    if (modal) modal.style.display = 'none';
+}
+
+function toggleManualArs() {
+    const seguroTipo = document.getElementById('manual-seguro-tipo').value;
+    const arsContainer = document.getElementById('container-manual-ars');
+    const afiliadoContainer = document.getElementById('container-manual-afiliado');
+    
+    if (seguroTipo === 'Seguro Médico') {
+        arsContainer.style.display = 'block';
+        afiliadoContainer.style.display = 'block';
+    } else {
+        arsContainer.style.display = 'none';
+        afiliadoContainer.style.display = 'none';
+    }
+}
+
+async function guardarCitaManual() {
+    const nombre = document.getElementById('manual-nombre').value.trim();
+    const telefono = document.getElementById('manual-telefono').value.trim();
+    const edad = document.getElementById('manual-edad').value.trim();
+    const fecha = document.getElementById('manual-fecha').value;
+    const especialidad = document.getElementById('manual-especialidad').value;
+    const motivo = document.getElementById('manual-motivo').value.trim();
+    const tipoSeguro = document.getElementById('manual-seguro-tipo').value;
+    const ars = document.getElementById('manual-ars').value;
+    const afiliado = document.getElementById('manual-afiliado').value.trim();
+
+    if (!nombre || !telefono || !fecha || !especialidad || !tipoSeguro) {
+        showToast('Por favor complete los campos obligatorios', 'error');
+        return;
+    }
+    
+    if (tipoSeguro === 'Seguro Médico' && !ars) {
+        showToast('Seleccione la ARS', 'error');
+        return;
+    }
+
+    const [y, m, d] = fecha.split('-');
+    const fechaObj = new Date(y, m - 1, d);
+    const fechaTexto = fechaObj.toLocaleDateString('es-DO', { day: 'numeric', month: 'long' });
+
+    let nombreArsReal = 'N/A';
+    if (tipoSeguro === 'Seguro Médico') {
+        nombreArsReal = ars;
+    } else {
+        nombreArsReal = 'Privada';
+    }
+    
+    const precio = calcularPrecio(especialidad, tipoSeguro, motivo);
+
+    const baseId = `MANUAL_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const idDatos = `DATOS_${baseId}`;
+
+    const nuevaCita = {
+        id: baseId,
+        paciente: nombre,
+        fecha: fecha,
+        fechaTexto: fechaTexto,
+        telefono: telefono,
+        motivoPrincipal: motivo || 'Consulta manual',
+        especialidad: especialidad,
+        tipoSeguro: tipoSeguro,
+        nombreArs: nombreArsReal,
+        precio: precio,
+        estado: 'completada', 
+        creadoEn: new Date().toISOString(),
+        creadoEnTexto: new Date().toLocaleString(),
+        edad: edad || 'No especificada',
+        numeroAfiliado: afiliado || ''
+    };
+
+    // Guardar datos completos
+    await setCitaEstado(idDatos, JSON.stringify({ cita: nuevaCita }));
+    
+    // Guardar el estado explícitamente para que la vista lo reconozca
+    await setCitaEstado(baseId, 'completada');
+
+    // Añadir a todasLasCitas en memoria temporalmente
+    todasLasCitas.push(nuevaCita);
+
+    // Auditoría
+    registrarAuditoria('Cita Manual', `Agregado paciente ${nombre} el ${fechaTexto}`, { paciente: nombre });
+
+    showToast('Paciente registrado correctamente', 'success');
+    cerrarModalCitaManual();
+    
+    // Actualizar vista
     recargarVistaActual();
 }
 
