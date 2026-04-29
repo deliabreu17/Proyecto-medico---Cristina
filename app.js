@@ -1123,21 +1123,32 @@ async function sincronizarEstados() {
             // Get current local state
             const estadosLocales = JSON.parse(localStorage.getItem('citasEstado') || '{}');
 
-            // Merge: remote data + preserve local deletions
+            // Merge: remote data + preserve newer local changes
             const estadosMerged = { ...estadosRemotos };
 
-            // Preserve locally deleted transactions
+            // Preservar transacciones locales más recientes o eliminaciones locales
             Object.keys(estadosLocales).forEach(key => {
                 const local = estadosLocales[key];
+                const remote = estadosRemotos[key];
+                
                 if (local && local.estado) {
+                    // 1. Conservar eliminaciones locales siempre
                     try {
                         const data = JSON.parse(local.estado);
                         if (data.deleted === true) {
-                            // Keep the local deletion
                             estadosMerged[key] = local;
-                            console.log('[SYNC] Preserving local deletion:', key);
+                            return; 
                         }
                     } catch (e) { }
+
+                    // 2. Comparar fechas. Si local es más reciente, conservarlo.
+                    // Esto evita que un refresh (F5) borre los cambios antes de que la nube los propague.
+                    const localTime = local.fecha ? new Date(local.fecha).getTime() : 0;
+                    const remoteTime = remote && remote.fecha ? new Date(remote.fecha).getTime() : 0;
+                    
+                    if (!remote || localTime > remoteTime) {
+                        estadosMerged[key] = local;
+                    }
                 }
             });
 
