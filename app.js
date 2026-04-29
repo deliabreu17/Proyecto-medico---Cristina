@@ -146,6 +146,11 @@ async function cargarDatosDeGoogle() {
         const csv = await response.text();
         const citas = parsearCSV(csv);
 
+        // Pre-asignar IDs originales para que no se pierdan al editar datos
+        citas.forEach(c => {
+            if (!c.id) c.id = generarCitaId(c);
+        });
+
         // Inject manual appointments
         const estados = getCitasEstado();
         Object.keys(estados).forEach(key => {
@@ -155,7 +160,23 @@ async function cargarDatosDeGoogle() {
                     if (data && data.cita && !data.deleted) {
                         const cita = data.cita;
                         cita.creadoEn = new Date(cita.creadoEn);
+                        cita.id = key.replace('DATOS_', '');
                         citas.push(cita);
+                    }
+                } catch(e) {}
+            }
+        });
+
+        // Aplicar ediciones (overrides)
+        Object.keys(estados).forEach(key => {
+            if (key.startsWith('EDIT_CITA_')) {
+                try {
+                    const editData = JSON.parse(estados[key].estado);
+                    const citaIdTarget = key.replace('EDIT_CITA_', '');
+                    
+                    const citaOriginal = citas.find(c => c.id === citaIdTarget);
+                    if (citaOriginal && editData.cambios) {
+                        Object.assign(citaOriginal, editData.cambios);
                     }
                 } catch(e) {}
             }
@@ -1136,7 +1157,7 @@ setInterval(sincronizarEstados, 30000);
 
 // Generar ID único para cita basado en datos
 function generarCitaId(cita) {
-    if (cita.id && String(cita.id).startsWith('MANUAL_')) return String(cita.id);
+    if (cita.id) return String(cita.id);
     return `${cita.paciente}_${cita.fecha}_${cita.telefono}`.replace(/[^a-zA-Z0-9]/g, '_');
 }
 
@@ -2334,6 +2355,7 @@ function mostrarHistorialPaciente(identificador) {
                                 </div>
 
                                 ${notasHTML}
+                                <button class="btn-edit-cita" onclick="iniciarEdicionCita('${citaId}')" style="margin-top: 10px; padding: 6px 12px; font-size: 0.85em; margin-right: 5px;">✏️ Editar Información</button>
                                 <button class="btn-add-note" onclick="agregarNota('${citaId}')" style="margin-top: 10px; padding: 6px 12px; font-size: 0.85em;">📝 Agregar nota</button>
                             </div>
                         `;
@@ -2499,6 +2521,10 @@ window.cerrarModalCitaManual = cerrarModalCitaManual;
 window.guardarCitaManual = guardarCitaManual;
 window.toggleManualArs = toggleManualArs;
 window.verificarPasswordGlobal = verificarPasswordGlobal;
+window.iniciarEdicionCita = iniciarEdicionCita;
+window.cerrarModalEditarCita = cerrarModalEditarCita;
+window.guardarEdicionCita = guardarEdicionCita;
+window.toggleEditArs = toggleEditArs;
 
 // ========================================
 // Centro de Notificaciones (Citas Recientes)
@@ -2879,6 +2905,8 @@ function verificarPasswordGlobal() {
             ejecutarRestauracion(citaRestaurarId);
         } else if (actionToAuthenticate === 'cita_manual') {
             abrirModalCitaManual();
+        } else if (actionToAuthenticate === 'editar_cita') {
+            abrirModalEditarCita();
         }
         cerrarModalPassword();
     } else {
@@ -2901,6 +2929,135 @@ async function ejecutarRestauracion(citaId) {
 
     showToast('Cita restaurada correctamente', 'success');
     recargarVistaActual();
+}
+
+// ========================================
+// EDICIÓN DE CITAS
+// ========================================
+
+let citaEditarId = null;
+
+function iniciarEdicionCita(citaId) {
+    citaEditarId = citaId;
+    actionToAuthenticate = 'editar_cita';
+    const modal = document.getElementById('modal-password-auth');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.getElementById('auth-password').value = '';
+        document.getElementById('auth-password').focus();
+    }
+}
+
+function abrirModalEditarCita() {
+    const modal = document.getElementById('modal-editar-cita');
+    const cita = todasLasCitas.find(c => c.id === citaEditarId || generarCitaId(c) === citaEditarId);
+    
+    if (modal && cita) {
+        document.getElementById('edit-cita-id').value = citaEditarId;
+        document.getElementById('edit-nombre').value = cita.paciente || '';
+        document.getElementById('edit-telefono').value = cita.telefono || '';
+        document.getElementById('edit-edad').value = cita.edad || '';
+        document.getElementById('edit-especialidad').value = cita.especialidad || 'Pediatría';
+        document.getElementById('edit-motivo').value = cita.motivoPrincipal || '';
+        document.getElementById('edit-seguro-tipo').value = cita.tipoSeguro || 'Privada';
+        document.getElementById('edit-ars').value = cita.nombreArs === 'N/A' ? '' : (cita.nombreArs || '');
+        document.getElementById('edit-afiliado').value = cita.numeroAfiliado || '';
+        
+        toggleEditArs();
+        modal.style.display = 'flex';
+    } else {
+        showToast('No se encontró la cita a editar', 'error');
+    }
+}
+
+function cerrarModalEditarCita() {
+    const modal = document.getElementById('modal-editar-cita');
+    if (modal) modal.style.display = 'none';
+    citaEditarId = null;
+}
+
+function toggleEditArs() {
+    const seguroTipo = document.getElementById('edit-seguro-tipo').value;
+    const arsContainer = document.getElementById('container-edit-ars');
+    const afiliadoContainer = document.getElementById('container-edit-afiliado');
+    
+    if (seguroTipo === 'Seguro Médico') {
+        arsContainer.style.display = 'block';
+        afiliadoContainer.style.display = 'block';
+    } else {
+        arsContainer.style.display = 'none';
+        afiliadoContainer.style.display = 'none';
+    }
+}
+
+async function guardarEdicionCita() {
+    const id = document.getElementById('edit-cita-id').value;
+    const nombre = document.getElementById('edit-nombre').value.trim();
+    const telefono = document.getElementById('edit-telefono').value.trim();
+    const edad = document.getElementById('edit-edad').value.trim();
+    const especialidad = document.getElementById('edit-especialidad').value;
+    const motivo = document.getElementById('edit-motivo').value.trim();
+    const tipoSeguro = document.getElementById('edit-seguro-tipo').value;
+    const ars = document.getElementById('edit-ars').value;
+    const afiliado = document.getElementById('edit-afiliado').value.trim();
+
+    if (!nombre || !telefono || !especialidad || !tipoSeguro) {
+        showToast('Por favor complete los campos obligatorios', 'error');
+        return;
+    }
+    
+    if (tipoSeguro === 'Seguro Médico' && !ars) {
+        showToast('Seleccione la ARS', 'error');
+        return;
+    }
+
+    let nombreArsReal = 'N/A';
+    if (tipoSeguro === 'Seguro Médico') {
+        nombreArsReal = ars;
+    } else {
+        nombreArsReal = 'Privada';
+    }
+    
+    const precio = calcularPrecio(especialidad, tipoSeguro, motivo);
+
+    const cambios = {
+        paciente: nombre,
+        telefono: telefono,
+        edad: edad || 'No especificada',
+        especialidad: especialidad,
+        motivoPrincipal: motivo,
+        tipoSeguro: tipoSeguro,
+        nombreArs: nombreArsReal,
+        numeroAfiliado: afiliado || '',
+        precio: precio
+    };
+
+    // Guardar cambios en la nube como un "override"
+    await setCitaEstado('EDIT_CITA_' + id, JSON.stringify({ cambios: cambios }));
+
+    // Aplicar a memoria temporalmente
+    const cita = todasLasCitas.find(c => c.id === id || generarCitaId(c) === id);
+    if (cita) {
+        Object.assign(cita, cambios);
+    }
+
+    // Auditoría
+    registrarAuditoria('Editar Cita', `Paciente editado: ${nombre} (${id})`, { citaId: id });
+
+    showToast('Información actualizada correctamente', 'success');
+    cerrarModalEditarCita();
+    
+    // Refrescar modal de historial si está abierto (ya que los datos cambiaron)
+    if (document.getElementById('modal-historial').style.display === 'flex') {
+        mostrarHistorialPaciente(obtenerIdPaciente(cita));
+    }
+    
+    // Actualizar vista subyacente
+    if (document.getElementById('view-citas').classList.contains('active')) {
+        cargarAgenda();
+    } else {
+        cargarDashboard();
+    }
 }
 
 // ========================================
