@@ -1007,6 +1007,9 @@ async function cargarPacientes() {
     citasDeduplicadas.forEach(c => {
         const telefonoNorm = normalizarTelefono(c.telefono);
         if (telefonoNorm && telefonoNorm.length >= 7) {
+            // Peso para determinar qué datos usar: priorizar ediciones recientes, luego fechas de cita
+            const pesoCita = c.ultimaEdicion ? c.ultimaEdicion : new Date(c.fecha || 0).getTime();
+
             if (!pacientesMap[telefonoNorm]) {
                 pacientesMap[telefonoNorm] = {
                     nombre: c.paciente,
@@ -1014,13 +1017,19 @@ async function cargarPacientes() {
                     telefonoNorm: telefonoNorm,
                     especialidad: c.especialidad,
                     tipoSeguro: c.tipoSeguro,
-                    citas: 1
+                    citas: 1,
+                    pesoMaximo: pesoCita
                 };
             } else {
                 pacientesMap[telefonoNorm].citas++;
-                // Mantener el nombre más largo
-                if (c.paciente.length > pacientesMap[telefonoNorm].nombre.length) {
+                
+                // Si esta cita fue editada recientemente o es más nueva, actualizamos el perfil del paciente
+                if (pesoCita >= pacientesMap[telefonoNorm].pesoMaximo) {
                     pacientesMap[telefonoNorm].nombre = c.paciente;
+                    pacientesMap[telefonoNorm].telefono = c.telefono;
+                    pacientesMap[telefonoNorm].especialidad = c.especialidad;
+                    pacientesMap[telefonoNorm].tipoSeguro = c.tipoSeguro;
+                    pacientesMap[telefonoNorm].pesoMaximo = pesoCita;
                 }
             }
         }
@@ -3040,7 +3049,8 @@ async function guardarEdicionCita() {
         tipoSeguro: tipoSeguro,
         nombreArs: nombreArsReal,
         numeroAfiliado: afiliado || '',
-        precio: precio
+        precio: precio,
+        ultimaEdicion: Date.now()
     };
 
     // Aplicar a memoria temporalmente
