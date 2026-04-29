@@ -3032,14 +3032,14 @@ async function guardarEdicionCita() {
         precio: precio
     };
 
-    // Guardar cambios en la nube como un "override"
-    await setCitaEstado('EDIT_CITA_' + id, JSON.stringify({ cambios: cambios }));
-
     // Aplicar a memoria temporalmente
     const cita = todasLasCitas.find(c => c.id === id || generarCitaId(c) === id);
     if (cita) {
         Object.assign(cita, cambios);
     }
+
+    // Guardar cambios en la nube como un "override" (en background sin bloquear)
+    setCitaEstado('EDIT_CITA_' + id, JSON.stringify({ cambios: cambios })).catch(console.error);
 
     // Auditoría
     registrarAuditoria('Editar Cita', `Paciente editado: ${nombre} (${id})`, { citaId: id });
@@ -3167,14 +3167,14 @@ async function guardarCitaManual() {
         numeroAfiliado: afiliado || ''
     };
 
-    // Guardar datos completos
-    await setCitaEstado(idDatos, JSON.stringify({ cita: nuevaCita }));
-    
-    // Guardar el estado explícitamente para que la vista lo reconozca
-    await setCitaEstado(baseId, 'completada');
-
     // Añadir a todasLasCitas en memoria temporalmente
     todasLasCitas.push(nuevaCita);
+
+    // Guardar datos completos (en background sin bloquear)
+    setCitaEstado(idDatos, JSON.stringify({ cita: nuevaCita })).catch(console.error);
+    
+    // Guardar el estado explícitamente para que la vista lo reconozca
+    setCitaEstado(baseId, 'completada').catch(console.error);
 
     // Auditoría
     registrarAuditoria('Cita Manual', `Agregado paciente ${nombre} el ${fechaTexto}`, { paciente: nombre });

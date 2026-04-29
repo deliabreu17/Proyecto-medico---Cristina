@@ -831,6 +831,7 @@
                     de administrador:</p>
                 <div class="form-group">
                     <input type="password" id="auth-password" class="form-input" placeholder="Contraseña..."
+                        onkeydown="if(event.key === 'Enter') verificarPasswordGlobal()"
                         style="text-align: center; padding: 14px 20px; font-size: 1.1rem; border-radius: 10px; border: 2px solid #e2e8f0; transition: all 0.3s ease;">
                 </div>
             </div>
