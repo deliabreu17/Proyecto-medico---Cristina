@@ -253,6 +253,8 @@
                         <p class="page-subtitle">Gestiona las citas del consultorio</p>
                     </div>
                     <div class="header-actions">
+                        <button id="btn-reagendar-grupo" class="btn-secondary" onclick="toggleModoSeleccion()" style="margin-right: 10px;">📅 Reagendar Grupo</button>
+                        <button id="btn-citas-manana" class="btn-secondary" onclick="verCitasManana()" style="margin-right: 10px;">📋 Confirmar Mañana</button>
                         <button class="btn-primary" onclick="iniciarCitaManual()" style="margin-right: 10px;">➕ Ingreso Manual</button>
                         <button id="btn-print-agenda" class="btn-secondary">🖨️ Imprimir</button>
                     </div>
@@ -281,6 +283,18 @@
 
                 <div id="citas-agenda-lista" class="citas-lista">
                     <p class="empty-state">Cargando citas...</p>
+                </div>
+
+                <!-- Barra flotante de reagendado en grupo -->
+                <div id="barra-seleccion-grupo" style="display: none;">
+                    <div class="grupo-info">
+                        <span id="grupo-count">0 citas seleccionadas</span>
+                    </div>
+                    <div class="grupo-acciones">
+                        <button class="btn-secondary" onclick="seleccionarTodasCitas()" style="margin-right: 10px;">☑️ Seleccionar Todas</button>
+                        <button class="btn-primary" onclick="reagendarGrupo()" style="margin-right: 10px;">📅 Reagendar Seleccionadas</button>
+                        <button class="btn-secondary" onclick="toggleModoSeleccion()">✖ Cancelar</button>
+                    </div>
                 </div>
             </section>
 

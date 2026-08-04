@@ -17,6 +17,10 @@ let fechaSeleccionada = new Date();
 let todasLasCitas = [];
 let todosPacientes = [];
 
+// Reagendado en Grupo
+let modoSeleccionActivo = false;
+let citasSeleccionadas = new Set();
+
 // Estado de filtros interactivos
 let filtrosActivos = {
     especialidad: null,
@@ -125,6 +129,9 @@ document.querySelectorAll('.nav-item, .link-btn').forEach(item => {
 });
 
 function cambiarVista(vista) {
+    if (vista !== 'citas' && modoSeleccionActivo) {
+        toggleModoSeleccion();
+    }
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById(`view-${vista}`).classList.add('active');
@@ -612,7 +619,11 @@ async function cargarDashboard(esAutoSync = false) {
     actualizarIndicadorSync(false);
 
     const hoyStr = hoy.toISOString().split('T')[0];
-    let citasHoy = todasLasCitas.filter(c => c.fecha === hoyStr);
+    let citasHoy = todasLasCitas.filter(c => {
+        const citaId = generarCitaId(c);
+        const estado = getCitaEstado(citaId);
+        return c.fecha === hoyStr && estado !== 'cancelada';
+    });
 
     // Deduplicar citas de hoy: mismo teléfono + misma fecha = una sola cita
     citasHoy = deduplicarCitas(citasHoy);
@@ -703,22 +714,7 @@ document.getElementById('btn-refresh')?.addEventListener('click', () => {
 // Lógica de Gestión de Citas (CRUD & Estados)
 // ========================================
 
-function generarCitaId(cita) {
-    if (cita.id) return String(cita.id);
-    // ID determinista basado en contenido si no hay ID único
-    return `${cita.fecha}-${cita.telefono}-${cita.paciente}`.replace(/[^a-zA-Z0-9]/g, '');
-}
 
-function getCitaEstado(citaId) {
-    const estados = JSON.parse(localStorage.getItem('citasEstados') || '{}');
-    return estados[citaId] || 'solicitada';
-}
-
-// setCitaEstado is defined later as async function with cloud sync (line ~1019)
-
-function getCitasReagendadas() {
-    return JSON.parse(localStorage.getItem('citasReagendadas') || '[]');
-}
 
 async function confirmarCita(citaId) {
     const confirmado = await showConfirm('¿Estás seguro de que deseas confirmar esta cita?', 'Confirmar Cita');
@@ -747,45 +743,7 @@ function cancelarCita(citaId) {
     }
 }
 
-function reagendarCita(citaId) {
-    // Usar DatePicker Modal existente
-    openDatePicker(null, (nuevaFecha) => {
-        if (nuevaFecha) {
-            const year = nuevaFecha.getFullYear();
-            const month = String(nuevaFecha.getMonth() + 1).padStart(2, '0');
-            const day = String(nuevaFecha.getDate()).padStart(2, '0');
-            const nuevaFechaStr = `${day}/${month}/${year}`; // Formato dd/mm/yyyy para compatibilidad visual
 
-            // Simulación de reagendado (guardar en localStorage para fusionar luego)
-            const lista = getCitasReagendadas();
-            // Buscar en todasLasCitas (ya sea array global o filtrado)
-            const citaOriginal = todasLasCitas.find(c => generarCitaId(c) === String(citaId));
-
-            if (citaOriginal) {
-                // Crear copia reagendada
-                const nuevaCita = { ...citaOriginal, fecha: nuevaFechaStr, fechaTexto: nuevaFechaStr, estado: 'reagendada_ok' };
-                // Asignar nuevo ID temporal para evitar colisiones
-                nuevaCita.id = 'R-' + Date.now();
-
-                lista.push(nuevaCita);
-                localStorage.setItem('citasReagendadas', JSON.stringify(lista));
-
-                // Marcar original como "reagendada"
-                setCitaEstado(citaId, 'reagendada');
-
-                // Log Auditoría
-                registrarAuditoria('Reagendar Cita', `Reagendada para ${nuevaFechaStr}. ID Original: ${citaId}`, {
-                    citaId, nuevaFecha: nuevaFechaStr
-                });
-
-                showToast(`Cita reagendada para el ${nuevaFechaStr}`, 'success');
-                recargarVistaActual();
-            } else {
-                showToast('No se pudo encontrar los datos de la cita original', 'error');
-            }
-        }
-    });
-}
 
 function recargarVistaActual() {
     if (document.getElementById('view-citas')?.classList.contains('active')) {
@@ -928,6 +886,13 @@ async function cargarAgenda() {
             if (c.fecha === fechaStr) citasFiltradas.push(c);
         });
 
+        // Excluir citas canceladas de la vista diaria
+        citasFiltradas = citasFiltradas.filter(c => {
+            const citaId = generarCitaId(c);
+            const estado = getCitaEstado(citaId);
+            return estado !== 'cancelada';
+        });
+
     } else {
         // Filtro Global
         let universo = [...todasLasCitas, ...getCitasReagendadas()];
@@ -989,6 +954,21 @@ document.getElementById('btn-next-day')?.addEventListener('click', () => {
     fechaSeleccionada.setDate(fechaSeleccionada.getDate() + 1);
     cargarAgenda();
 });
+
+function verCitasManana() {
+    const manana = new Date();
+    manana.setDate(manana.getDate() + 1);
+    fechaSeleccionada = manana;
+    
+    // Asegurarse de que el filtro esté en citas del día
+    const filtroEl = document.getElementById('agenda-estado-filter');
+    if (filtroEl) {
+        filtroEl.value = 'dia';
+    }
+    
+    // Cambiar a la vista de agenda
+    cambiarVista('citas');
+}
 
 // ========================================
 // Pacientes
@@ -1226,8 +1206,18 @@ function mostrarCitas(citas, containerId) {
         // Mostrar notas si existen
         const notasHTML = notas ? `<div class="cita-notas">📝 ${notas}</div>` : '';
 
+        const esSeleccionable = estado !== 'reagendada' && estado !== 'completada';
+        const checkboxHTML = (modoSeleccionActivo && esSeleccionable) ? `
+            <input type="checkbox" class="cita-checkbox" 
+                   id="check-${citaId}" 
+                   onchange="toggleSeleccionCita('${citaId}')"
+                   ${citasSeleccionadas.has(citaId) ? 'checked' : ''}>
+        ` : '';
+        const claseSeleccionada = (modoSeleccionActivo && citasSeleccionadas.has(citaId)) ? 'seleccionada' : '';
+
         return `
-            <div class="cita-item ${estadoInfo.clase}" data-cita-id="${citaId}">
+            <div class="cita-item ${estadoInfo.clase} ${claseSeleccionada}" data-cita-id="${citaId}">
+                ${checkboxHTML}
                 <div class="cita-avatar" onclick="mostrarHistorialPaciente('${idPaciente}')" style="cursor:pointer" title="Ver historial">${getInitials(cita.paciente)}</div>
                 <div class="cita-info">
                     <div class="cita-nombre">${cita.paciente}</div>
@@ -1272,6 +1262,7 @@ function guardarCitaReagendada(citaOriginal, nuevaFecha) {
     // Crear copia de la cita con nueva fecha (usando hora local, no UTC)
     const nuevaCita = {
         ...citaOriginal,
+        id: 'R-' + Date.now() + '-' + Math.floor(Math.random() * 1000), // Nuevo ID único para evitar colisión de estado
         fecha: formatearFechaLocal(nuevaFecha),
         fechaTexto: nuevaFecha.toLocaleDateString('es-DO', { day: 'numeric', month: 'long' }),
         esReagendada: true,
@@ -1310,6 +1301,110 @@ function reagendarCita(citaId) {
         } else {
             cargarDashboard();
         }
+    });
+}
+
+// ========================================
+// Reagendado en Grupo
+// ========================================
+
+function toggleModoSeleccion() {
+    modoSeleccionActivo = !modoSeleccionActivo;
+    citasSeleccionadas.clear();
+    
+    const barra = document.getElementById('barra-seleccion-grupo');
+    const btnGrupo = document.getElementById('btn-reagendar-grupo');
+    
+    if (modoSeleccionActivo) {
+        if (barra) barra.style.display = 'flex';
+        if (btnGrupo) {
+            btnGrupo.textContent = '✖ Cancelar Grupo';
+            btnGrupo.classList.add('active');
+        }
+    } else {
+        if (barra) barra.style.display = 'none';
+        if (btnGrupo) {
+            btnGrupo.textContent = '📅 Reagendar Grupo';
+            btnGrupo.classList.remove('active');
+        }
+    }
+    
+    cargarAgenda();
+}
+
+function toggleSeleccionCita(citaId) {
+    const cb = document.getElementById(`check-${citaId}`);
+    const item = cb?.closest('.cita-item');
+    
+    if (citasSeleccionadas.has(citaId)) {
+        citasSeleccionadas.delete(citaId);
+        if (item) item.classList.remove('seleccionada');
+    } else {
+        citasSeleccionadas.add(citaId);
+        if (item) item.classList.add('seleccionada');
+    }
+    actualizarContadorGrupo();
+}
+
+function seleccionarTodasCitas() {
+    const checkboxes = document.querySelectorAll('#citas-agenda-lista .cita-checkbox');
+    if (checkboxes.length === 0) return;
+    
+    const todosMarcados = Array.from(checkboxes).every(cb => cb.checked);
+    
+    checkboxes.forEach(cb => {
+        const citaId = cb.id.replace('check-', '');
+        cb.checked = !todosMarcados;
+        const item = cb.closest('.cita-item');
+        if (!todosMarcados) {
+            citasSeleccionadas.add(citaId);
+            if (item) item.classList.add('seleccionada');
+        } else {
+            citasSeleccionadas.delete(citaId);
+            if (item) item.classList.remove('seleccionada');
+        }
+    });
+    actualizarContadorGrupo();
+}
+
+function actualizarContadorGrupo() {
+    const el = document.getElementById('grupo-count');
+    if (el) {
+        el.textContent = `${citasSeleccionadas.size} cita${citasSeleccionadas.size !== 1 ? 's' : ''} seleccionada${citasSeleccionadas.size !== 1 ? 's' : ''}`;
+    }
+}
+
+function reagendarGrupo() {
+    if (citasSeleccionadas.size === 0) {
+        showToast('Por favor, selecciona al menos una cita para reagendar', 'error');
+        return;
+    }
+
+    openDatePicker(new Date(), (nuevaFecha) => {
+        if (!nuevaFecha) return;
+
+        let reagendadasCount = 0;
+        citasSeleccionadas.forEach(citaId => {
+            // Buscar la cita original
+            let citaOriginal = todasLasCitas.find(c => generarCitaId(c) === citaId);
+            if (!citaOriginal) {
+                const citasReagendadas = getCitasReagendadas();
+                citaOriginal = citasReagendadas.find(c => generarCitaId(c) === citaId);
+            }
+
+            if (citaOriginal) {
+                // Marcar original como reagendada en segundo plano
+                setCitaEstado(citaId, 'reagendada');
+                // Guardar la nueva cita copiada
+                guardarCitaReagendada(citaOriginal, nuevaFecha);
+                reagendadasCount++;
+            }
+        });
+
+        showToast(`${reagendadasCount} cita(s) reagendada(s) correctamente para el ${nuevaFecha.toLocaleDateString('es-DO')}`, 'success');
+        
+        // Desactivar modo selección al finalizar
+        toggleModoSeleccion();
     });
 }
 
@@ -2545,6 +2640,7 @@ window.iniciarEdicionCita = iniciarEdicionCita;
 window.cerrarModalEditarCita = cerrarModalEditarCita;
 window.guardarEdicionCita = guardarEdicionCita;
 window.toggleEditArs = toggleEditArs;
+window.verCitasManana = verCitasManana;
 
 // ========================================
 // Centro de Notificaciones (Citas Recientes)
@@ -3181,7 +3277,7 @@ async function guardarCitaManual() {
         tipoSeguro: tipoSeguro,
         nombreArs: nombreArsReal,
         precio: precio,
-        estado: 'completada', 
+        estado: 'pendiente', 
         creadoEn: new Date().toISOString(),
         creadoEnTexto: new Date().toLocaleString(),
         edad: edad || 'No especificada',
@@ -3195,7 +3291,7 @@ async function guardarCitaManual() {
     setCitaEstado(idDatos, JSON.stringify({ cita: nuevaCita })).catch(console.error);
     
     // Guardar el estado explícitamente para que la vista lo reconozca
-    setCitaEstado(baseId, 'completada').catch(console.error);
+    setCitaEstado(baseId, 'pendiente').catch(console.error);
 
     // Auditoría
     registrarAuditoria('Cita Manual', `Agregado paciente ${nombre} el ${fechaTexto}`, { paciente: nombre });
