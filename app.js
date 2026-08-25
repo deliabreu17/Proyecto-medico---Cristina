@@ -3,7 +3,6 @@
 // ========================================
 
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTXEZOcduqT6LDEGsqwkecQMojBvdY9ejfvsu84luiq-v9YJDtyPhWbLbA6RMwm8256vpzB39kHUesE/pub?gid=411263367&single=true&output=csv';
-const CORS_PROXY = 'https://corsproxy.io/?';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwY6RBxV9lu_TUZMtdmyv2aa50q8VQtPzebORmVHz19rm5Ur6EVsOJdQ_KAP_c4ZtcZ/exec';
 
 const USUARIOS = {
@@ -149,8 +148,28 @@ function cambiarVista(vista) {
 
 async function cargarDatosDeGoogle() {
     try {
-        const response = await fetch(CORS_PROXY + encodeURIComponent(SHEET_URL));
-        const csv = await response.text();
+        const urlConCacheBuster = `${SHEET_URL}&_t=${Date.now()}`;
+        let csv = '';
+        
+        try {
+            const response = await fetch(urlConCacheBuster);
+            if (response.ok) {
+                csv = await response.text();
+            } else {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        } catch (errDirect) {
+            console.warn('Fetch directo falló, intentando con fallback proxy...', errDirect);
+            const fallbackUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(urlConCacheBuster)}`;
+            const responseFallback = await fetch(fallbackUrl);
+            csv = await responseFallback.text();
+        }
+
+        // Validar que no sea una respuesta de error JSON
+        if (!csv || (csv.trim().startsWith('{') && csv.includes('"error"'))) {
+            throw new Error('Respuesta inválida al descargar Google Sheets');
+        }
+
         const citas = parsearCSV(csv);
 
         // Pre-asignar IDs originales para que no se pierdan al editar datos
